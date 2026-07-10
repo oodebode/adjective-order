@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shape Builder</title>
+<style>
+  :root{
+    --gray-label: #8a8a8a;
+    --gray-line: #e3e3e3;
+    --board-bg: #ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:#ffffff;
+    color:#222;
+    padding:24px 24px 40px;
+  }
+  .wrap{max-width:1150px;width:100%;margin:0 auto;position:relative;}
+
+  .top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .instruction{
+    font-size:20px;
+    line-height:1.5;
+    color:#222;
+    max-width:620px;
+    opacity:0;
+    transition:opacity .25s ease;
+  }
+  .instruction b{font-weight:600;color:#111;}
+  .stats{
+    font-size:13px;
+    color:var(--gray-label);
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  /* full-screen scene shown at the start of each trial: a static
+     heading ("Build a star that is:") plus the adjective words
+     scattered around the screen, each drifting on its own trajectory */
+  .word-float-container{
+    position:fixed;
+    inset:0;
+    z-index:50;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .4s ease;
+  }
+  .wf-heading{
+    position:absolute;
+    top:9%;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:28px;
+    line-height:1.4;
+    text-align:center;
+    color:#222;
+    white-space:nowrap;
+  }
+  .wf-heading b{font-weight:600;color:#111;}
+  .wf-word{
+    position:absolute;
+    top:0;
+    left:0;
+    font-size:24px;
+    font-weight:600;
+    color:#111;
+    white-space:nowrap;
+  }
+
+  /* persistent zone below the board: the same characteristic words keep
+     drifting here, on their own trajectories, once the dashboard is up */
+  .characteristics-float{
+    position:relative;
+    width:100%;
+    height:80px; /* fallback; actual height is set by JS to fill remaining viewport space */
+    margin-top:28px;
+    overflow:hidden;
+  }
+  .cf-word{
+    position:absolute;
+    top:0;
+    left:0;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.01em;
+    color:#555;
+    background:#f4f4f4;
+    border-radius:14px;
+    padding:5px 12px;
+    white-space:nowrap;
+  }
+
+  .stage{
+    transition:opacity .4s ease, transform .4s ease;
+  }
+  .stage.hidden-stage{
+    opacity:0;
+    transform:translateY(10px);
+    pointer-events:none;
+  }
+
+  .layout{
+    display:flex;
+    gap:48px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .board-col{flex:1.6 1 340px;}
+  .board{
+    width:100%;
+    max-width:520px;
+    aspect-ratio:1 / 1;
+    background:var(--board-bg);
+    border:1px solid var(--gray-line);
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:visible;
+  }
+  .board svg{overflow:visible;}
+  .board-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+  button.action{
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.02em;
+    border:none;
+    border-radius:5px;
+    padding:9px 20px;
+    cursor:pointer;
+    transition:opacity .15s ease;
+  }
+  button.action:hover{opacity:.85;}
+  button.submit{background:#111;color:#fff;}
+
+  .panel-col{flex:1 1 300px;min-width:300px;max-width:380px;}
+  .panel{}
+  .row{
+    display:flex;
+    align-items:center;
+    padding:14px 0;
+    border-bottom:1px solid var(--gray-line);
+  }
+  .row:first-child{border-top:1px solid var(--gray-line);}
+  .row-label{
+    width:78px;
+    flex:0 0 78px;
+    color:var(--gray-label);
+    font-size:16px;
+  }
+  .options{
+    display:flex;
+    gap:10px;
+    flex-wrap:nowrap;
+  }
+  .opt{
+    background:none;
+    border:2px solid transparent;
+    border-radius:7px;
+    padding:3px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:0;
+    flex:0 0 auto;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  .opt svg{width:22px;height:22px;}
+  .opt:hover{transform:translateY(-1px);}
+  .opt.selected{border-color:#111;}
+  .swatch{
+    width:20px;height:20px;border-radius:50%;
+  }
+
+  @media (max-width:640px){
+    .layout{gap:28px;}
+    .row-label{width:72px;flex:0 0 72px;font-size:14px;}
+    .wf-heading{font-size:20px;}
+    .wf-word{font-size:18px;}
+  }
+
+  /* motion animations, applied to the inner <g> that wraps the shape */
+  .m-drift{ animation: driftAnim 2.2s ease-in-out infinite; transform-origin:100px 100px; }
+  .m-spin{ animation: spinAnim 3s linear infinite; transform-origin:100px 100px; }
+  .m-shake{ animation: shakeAnim 0.5s ease-in-out infinite; transform-origin:100px 100px; }
+  .m-pulse{ animation: pulseAnim 1.4s ease-in-out infinite; transform-origin:100px 100px; }
+
+  @keyframes driftAnim{
+    0%{transform:translateX(-38px);}
+    50%{transform:translateX(38px);}
+    100%{transform:translateX(-38px);}
+  }
+  @keyframes spinAnim{
+    from{transform:rotate(0deg);}
+    to{transform:rotate(360deg);}
+  }
+  @keyframes shakeAnim{
+    0%,100%{transform:rotate(-9deg);}
+    50%{transform:rotate(9deg);}
+  }
+  @keyframes pulseAnim{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.18);}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="word-float-container" id="wordFloat">
+    <div class="wf-heading" id="wfHeading"></div>
+  </div>
+
+  <div class="top">
+    <div class="instruction" id="instructionText"></div>
+    <div class="stats" id="statsText"></div>
+  </div>
+
+  <div class="layout stage hidden-stage" id="stage">
+    <div class="board-col">
+      <div class="board" id="board"></div>
+      <div class="board-actions">
+        <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <div class="panel" id="panel"></div>
+      <div class="characteristics-float" id="charFloat"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Config: shapes and the four adjective categories
+---------------------------------------------------------------- */
+const SHAPES = ['circle','square','triangle','diamond','star'];
+
+const COLOR_OPTIONS = [
+  {id:'blue',   hex:'#2196F3'},
+  {id:'green',  hex:'#4CAF50'},
+  {id:'red',    hex:'#E53935'},
+  {id:'orange', hex:'#FFA726'},
+  {id:'pink',   hex:'#EC407A'},
+  {id:'purple', hex:'#8E44AD'}
+];
+
+const CATEGORIES = [
+  { key:'size',    label:'Size',    adjective:{small:'small', large:'large'},
+    options:[
+      {id:'small', label:'Small', icon:sizeIcon('small')},
+      {id:'large', label:'Large', icon:sizeIcon('large')}
+    ]},
+  { key:'color',   label:'Color',   adjective:Object.fromEntries(COLOR_OPTIONS.map(c=>[c.id,c.id])),
+    options: COLOR_OPTIONS.map(c=>({
+      id:c.id,
+      label:c.id.charAt(0).toUpperCase()+c.id.slice(1),
+      icon:`<span class="swatch" style="background:${c.hex}"></span>`,
+      hex:c.hex
+    }))
+  },
+  { key:'texture', label:'Texture', adjective:{striped:'striped', dotted:'dotted', zigzag:'zigzag', checkered:'checkered', plain:'plain'},
+    options:[
+      {id:'striped',   label:'Striped',   icon:textureIcon('striped')},
+      {id:'dotted',    label:'Dotted',    icon:textureIcon('dotted')},
+      {id:'zigzag',    label:'Zigzag',    icon:textureIcon('zigzag')},
+      {id:'checkered', label:'Checkered', icon:textureIcon('checkered')},
+      {id:'plain',     label:'Plain',     icon:textureIcon('plain')}
+    ]},
+  { key:'motion',  label:'Motion',  adjective:{drift:'drifting', spin:'spinning', shake:'shaking', pulse:'pulsing', still:'still'},
+    options:[
+      {id:'drift', label:'Drift', icon:motionIcon('drift')},
+      {id:'spin',  label:'Spin',  icon:motionIcon('spin')},
+      {id:'shake', label:'Shake', icon:motionIcon('shake')},
+      {id:'pulse', label:'Pulse', icon:motionIcon('pulse')},
+      {id:'still', label:'Still', icon:motionIcon('still')}
+    ]}
+];
+
+const DEFAULT_FILL = '#171717';
+
+/* ---------------------------------------------------------------
+   Icons (built to match the reference sketch: thin black arrows,
+   line-based texture glyphs)
+---------------------------------------------------------------- */
+function sizeIcon(kind){
+  // four thin diagonal arrows: converging toward the center for 'small',
+  // fanning out from the center for 'large'
+  const mid = 'arrow-size-' + kind;
+  const segs = kind === 'small'
+    ? [[3,3,11,11],[25,3,17,11],[3,25,11,17],[25,25,17,17]]
+    : [[11,11,3,3],[17,11,25,3],[11,17,3,25],[17,17,25,25]];
+  const lines = segs.map(([x1,y1,x2,y2])=>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="1.3" marker-end="url(#${mid})"/>`
+  ).join('');
+  return `<svg width="28" height="28" viewBox="0 0 28 28">
+    <defs><marker id="${mid}" markerWidth="6" markerHeight="6" refX="4.2" refY="2.5" orient="auto"><polygon points="0,0 5,2.5 0,5" fill="#111"/></marker></defs>
+    ${lines}
+  </svg>`;
+}
+
+function textureIcon(kind){
+  if(kind==='striped'){
+    let lines='';
+    for(let i=0;i<4;i++){ const x=5+i*6; lines+=`<line x1="${x}" y1="4" x2="${x}" y2="24" stroke="#111" stroke-width="3"/>`; }
+    return `<svg width="28" height="28" viewBox="0 0 28 28">${lines}</svg>`;
+  }
+  if(kind==='dotted'){
+    const pts=[[7,9],[15,9],[23,9],[11,19],[19,19]];
+    const dots = pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3" fill="#111"/>`).join('');
+    return `<svg width="28" height="28" viewBox="0 0 28 28">${dots}</svg>`;
+  }
+  if(kind==='zigzag'){
+    return `<svg width="28" height="28" viewBox="0 0 28 28">
+      <polyline points="2,12 8,6 14,12 20,6 26,12" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <polyline points="2,22 8,16 14,22 20,16 26,22" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+  }
+  if(kind==='checkered'){
+    let squares='';
+    for(let r=0;r<3;r++){
+      for(let c=0;c<3;c++){
+        if((r+c)%2===0){
+          squares += `<rect x="${3+c*7.3}" y="${3+r*7.3}" width="7.3" height="7.3" fill="#111"/>`;
+        }
+      }
+    }
+    return `<svg width="28" height="28" viewBox="0 0 28 28">${squares}</svg>`;
+  }
+  // plain: a flat solid swatch, no pattern
+  return `<svg width="28" height="28" viewBox="0 0 28 28">
+    <rect x="5" y="5" width="18" height="18" rx="3" fill="#111"/>
+  </svg>`;
+}
+
+function motionIcon(kind){
+  if(kind==='drift'){
+    return `<svg width="28" height="28" viewBox="0 0 28 28">
+      <defs><marker id="arrow-drift" markerWidth="6" markerHeight="6" refX="4.2" refY="2.5" orient="auto"><polygon points="0,0 5,2.5 0,5" fill="#111"/></marker></defs>
+      <line x1="4" y1="14" x2="19" y2="14" stroke="#111" stroke-width="1.6" marker-end="url(#arrow-drift)"/>
+      <line x1="4" y1="9"  x2="10" y2="9"  stroke="#111" stroke-width="1.3" opacity=".5"/>
+      <line x1="4" y1="19" x2="10" y2="19" stroke="#111" stroke-width="1.3" opacity=".5"/>
+    </svg>`;
+  }
+  if(kind==='spin'){
+    // arc swept clockwise from -90deg to 180deg around (14,14) r=8;
+    // arrowhead is a hand-built isoceles triangle centered exactly on
+    // the arc's endpoint, tip pointing along the tangent direction.
+    const cx=14, cy=14, r=8;
+    const start = {x:cx, y:cy-r};   // -90deg
+    const end   = {x:cx-r, y:cy};   // 180deg, tangent (clockwise) = (0,-1)
+    const tipLen=5, halfW=2.2;
+    const tip = [end.x, end.y - tipLen];
+    const b1  = [end.x + halfW, end.y];
+    const b2  = [end.x - halfW, end.y];
+    return `<svg width="28" height="28" viewBox="0 0 28 28">
+      <path d="M${start.x},${start.y} A${r},${r} 0 1 1 ${end.x},${end.y}" fill="none" stroke="#111" stroke-width="1.6"/>
+      <polygon points="${tip.join(',')} ${b1.join(',')} ${b2.join(',')}" fill="#111"/>
+    </svg>`;
+  }
+  if(kind==='shake'){
+    // two small curved arrows, arcing oppositely above and below center,
+    // to read as a back-and-forth wobble rather than a straight double-arrow
+    const grey = '#111';
+    const arrow = (ex,ey,tx,ty)=>{
+      const len = Math.sqrt(tx*tx+ty*ty); const ux=tx/len, uy=ty/len;
+      const px=-uy, py=ux;
+      const tipLen=4.2, halfW=2.1;
+      const tip=[ex+ux*tipLen, ey+uy*tipLen];
+      const b1=[ex+px*halfW, ey+py*halfW];
+      const b2=[ex-px*halfW, ey-py*halfW];
+      return `${tip[0].toFixed(1)},${tip[1].toFixed(1)} ${b1[0].toFixed(1)},${b1[1].toFixed(1)} ${b2[0].toFixed(1)},${b2[1].toFixed(1)}`;
+    };
+    // top arc: curves up then ends pointing right; tangent at end = end - control
+    const topEnd=[20,10], topCtrl=[14,3];
+    const topTangent=[topEnd[0]-topCtrl[0], topEnd[1]-topCtrl[1]];
+    // bottom arc: curves down then ends pointing left; tangent at end = end - control
+    const botEnd=[8,18], botCtrl=[14,25];
+    const botTangent=[botEnd[0]-botCtrl[0], botEnd[1]-botCtrl[1]];
+    return `<svg width="28" height="28" viewBox="0 0 28 28">
+      <path d="M8,10 Q${topCtrl[0]},${topCtrl[1]} ${topEnd[0]},${topEnd[1]}" fill="none" stroke="${grey}" stroke-width="1.6" stroke-linecap="round"/>
+      <polygon points="${arrow(topEnd[0],topEnd[1],topTangent[0],topTangent[1])}" fill="${grey}"/>
+      <path d="M20,18 Q${botCtrl[0]},${botCtrl[1]} ${botEnd[0]},${botEnd[1]}" fill="none" stroke="${grey}" stroke-width="1.6" stroke-linecap="round"/>
+      <polygon points="${arrow(botEnd[0],botEnd[1],botTangent[0],botTangent[1])}" fill="${grey}"/>
+    </svg>`;
+  }
+  if(kind==='still'){
+    return `<svg width="28" height="28" viewBox="0 0 28 28">
+      <rect x="11" y="11" width="6" height="6" fill="#111"/>
+    </svg>`;
+  }
+  // pulse
+  return `<svg width="28" height="28" viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="4" fill="#111"/>
+    <circle cx="14" cy="14" r="9" fill="none" stroke="#111" stroke-width="1.5" opacity=".55"/>
+    <circle cx="14" cy="14" r="13" fill="none" stroke="#111" stroke-width="1.2" opacity=".3"/>
+  </svg>`;
+}
+
+/* ---------------------------------------------------------------
+   Shape geometry (200x200 viewBox)
+---------------------------------------------------------------- */
+function starPoints(cx,cy,rOuter,rInner,n=5){
+  let pts=[];
+  for(let i=0;i<n*2;i++){
+    const r = i%2===0 ? rOuter : rInner;
+    const a = (Math.PI/n)*i - Math.PI/2;
+    pts.push(`${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+function regularPolygonPoints(cx,cy,r,n){
+  // vertices evenly spaced around a circle -> centroid is always exactly (cx,cy)
+  let pts=[];
+  for(let i=0;i<n;i++){
+    const a = -Math.PI/2 + i*(2*Math.PI/n);
+    pts.push(`${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+function shapeMarkup(shape, fill, R){
+  switch(shape){
+    case 'circle':   return `<circle cx="100" cy="100" r="${R.toFixed(2)}" fill="${fill}"/>`;
+    case 'square': {
+      // A square's corner (not its edge) is what's R away from center, so its
+      // half-width is R/sqrt(2) -- this keeps the square's own rotation-safe
+      // enclosing square (its diagonal-swept circle) equal to every other
+      // shape's, rather than under- or over-sizing it relative to them.
+      const hw = R / Math.SQRT2;
+      const rx = Math.max(2, hw * 0.11);
+      return `<rect x="${(100-hw).toFixed(2)}" y="${(100-hw).toFixed(2)}" width="${(hw*2).toFixed(2)}" height="${(hw*2).toFixed(2)}" rx="${rx.toFixed(2)}" fill="${fill}"/>`;
+    }
+    case 'triangle': return `<polygon points="${regularPolygonPoints(100,100,R,3)}" fill="${fill}"/>`;
+    case 'diamond':  return `<polygon points="100,${(100-R).toFixed(2)} ${(100+R).toFixed(2)},100 100,${(100+R).toFixed(2)} ${(100-R).toFixed(2)},100" fill="${fill}"/>`;
+    case 'star':     return `<polygon points="${starPoints(100,100,R,R*0.4)}" fill="${fill}"/>`;
+  }
+}
+
+/* ---------------------------------------------------------------
+   State
+---------------------------------------------------------------- */
+let state = {
+  target: null,
+  build: { size:null, color:null, texture:null, motion:null },
+  rowOrder: [],
+  optionOrder: {},
+  sentenceOrder: [],
+  trialCount: 0
+};
+
+const MOVE_MS = 850;      // duration of the glide-up animation
+const READING_WPM = 220;  // average adult silent-reading speed
+const MIN_READ_MS = 1400; // floor so even a short sentence doesn't flash by
+
+function readingTimeMs(text){
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(MIN_READ_MS, Math.round(words / READING_WPM * 60 * 1000));
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function buildSentenceHTML(target){
+  const adjectives = state.sentenceOrder.map(catKey=>{
+    const cat = CATEGORIES.find(c=>c.key===catKey);
+    return cat.adjective[target[catKey]];
+  });
+  const article = /^[aeiou]/i.test(adjectives[0]) ? 'an' : 'a';
+  return `Build ${article} <b>${adjectives.join('</b>, <b>')}</b> <b>${target.shape}</b>.`;
+}
+
+function newTrial(){
+  const shape = pickRandom(SHAPES);
+  const target = { shape };
+  CATEGORIES.forEach(cat=>{
+    target[cat.key] = pickRandom(cat.options).id;
+  });
+
+  state.target = target;
+  state.build = { size:null, color:null, texture:null, motion:null };
+  state.rowOrder = shuffle(CATEGORIES.map(c=>c.key));
+  state.optionOrder = {};
+  CATEGORIES.forEach(cat=>{
+    state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
+  });
+  state.sentenceOrder = shuffle(CATEGORIES.map(c=>c.key));
+  state.trialCount += 1;
+
+  runTrialIntro();
+}
+
+function submitTrial(){
+  newTrial();
+}
+
+function selectOption(catKey, optId){
+  state.build[catKey] = state.build[catKey] === optId ? null : optId;
+  render();
+}
+
+/* ---------------------------------------------------------------
+   Trial intro: a static heading ("Build a star that is:") appears,
+   and the adjective words for this trial scatter to random spots
+   around the screen, each drifting on its own independent velocity
+   and bouncing off the screen edges so it's never lost off-screen.
+   After a beat, everything fades and the board/panel reveal.
+---------------------------------------------------------------- */
+const FLOAT_MIN_MS = 2200;             // floor float time even with few words
+const FLOAT_MS_PER_WORD = 550;         // extra float time per adjective word
+const WORD_SPEED_MIN = 35;             // px/s
+const WORD_SPEED_MAX = 70;             // px/s
+const WORD_MARGIN = 16;                // keep words this far from screen edges
+const HEADING_ZONE_FRAC = 0.22;        // top fraction of screen reserved for heading
+
+let floatAnimHandle = null;
+let persistentAnimHandle = null;
+
+function bodiesNonOverlap(x, y, w, h, list){
+  for(const b of list){
+    if(x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y) return false;
+  }
+  return true;
+}
+
+function runTrialIntro(){
+  const stage = document.getElementById('stage');
+  const submitBtn = document.getElementById('submitBtn');
+  const container = document.getElementById('wordFloat');
+  const heading = document.getElementById('wfHeading');
+  const topText = document.getElementById('instructionText');
+  const charFloat = document.getElementById('charFloat');
+
+  stage.classList.add('hidden-stage');
+  submitBtn.disabled = true;
+
+  if(floatAnimHandle) cancelAnimationFrame(floatAnimHandle);
+  if(persistentAnimHandle) cancelAnimationFrame(persistentAnimHandle);
+  container.querySelectorAll('.wf-word').forEach(el=>el.remove());
+  charFloat.querySelectorAll('.cf-word').forEach(el=>el.remove());
+
+  const target = state.target;
+  const article = /^[aeiou]/i.test(target.shape) ? 'an' : 'a';
+  // this heading names the shape only -- never the full sentence
+  const headingHtml = `Build ${article} <b>${target.shape}</b> that is:`;
+  heading.innerHTML = headingHtml;
+  topText.innerHTML = headingHtml;
+  topText.style.opacity = 0;
+
+  const adjectives = state.sentenceOrder.map(catKey=>{
+    const cat = CATEGORIES.find(c=>c.key===catKey);
+    return cat.adjective[target[catKey]];
+  });
+
+  container.style.transition = 'none';
+  container.style.opacity = 1;
+  container.offsetHeight; // force reflow
+  container.style.transition = '';
+
+  const wordEls = adjectives.map(word=>{
+    const el = document.createElement('div');
+    el.className = 'wf-word';
+    el.textContent = word;
+    container.appendChild(el);
+    return el;
+  });
+
+  requestAnimationFrame(()=>{
+    const cw = window.innerWidth;
+    const ch = window.innerHeight;
+    const topBound = ch * HEADING_ZONE_FRAC;
+
+    const bodies = [];
+    wordEls.forEach(el=>{
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      let x, y, tries = 0, ok;
+      do {
+        x = WORD_MARGIN + Math.random() * Math.max(1, cw - w - WORD_MARGIN*2);
+        y = topBound + Math.random() * Math.max(1, ch - h - topBound - WORD_MARGIN);
+        ok = bodiesNonOverlap(x, y, w, h, bodies);
+        tries++;
+      } while(!ok && tries < 40);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = WORD_SPEED_MIN + Math.random() * (WORD_SPEED_MAX - WORD_SPEED_MIN);
+      bodies.push({ el, x, y, w, h, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed });
+    });
+
+    bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
+
+    const floatDuration = Math.max(FLOAT_MIN_MS, MIN_READ_MS + adjectives.length*FLOAT_MS_PER_WORD);
+    const startT = performance.now();
+    let lastT = startT;
+
+    function tick(now){
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const cw2 = window.innerWidth;
+      const ch2 = window.innerHeight;
+      const topBound2 = ch2 * HEADING_ZONE_FRAC;
+
+      // move + bounce off screen edges, so words never leave the screen
+      bodies.forEach(b=>{
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        if(b.x < WORD_MARGIN){ b.x = WORD_MARGIN; b.vx = Math.abs(b.vx); }
+        if(b.x + b.w > cw2 - WORD_MARGIN){ b.x = cw2 - WORD_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
+        if(b.y < topBound2){ b.y = topBound2; b.vy = Math.abs(b.vy); }
+        if(b.y + b.h > ch2 - WORD_MARGIN){ b.y = ch2 - WORD_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
+      });
+
+      // gentle separation so words don't sit on top of each other and stay legible
+      for(let i=0;i<bodies.length;i++){
+        for(let j=i+1;j<bodies.length;j++){
+          const a = bodies[i], b = bodies[j];
+          const ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2;
+          const dx = bx-ax, dy = by-ay;
+          const minDx = (a.w+b.w)/2 + 8;
+          const minDy = (a.h+b.h)/2 + 8;
+          if(Math.abs(dx) < minDx && Math.abs(dy) < minDy){
+            const overlapX = minDx - Math.abs(dx);
+            const overlapY = minDy - Math.abs(dy);
+            if(overlapX < overlapY){
+              const push = overlapX/2 * (dx < 0 ? -1 : 1);
+              a.x -= push; b.x += push;
+              const t = a.vx; a.vx = b.vx; b.vx = t;
+            } else {
+              const push = overlapY/2 * (dy < 0 ? -1 : 1);
+              a.y -= push; b.y += push;
+              const t = a.vy; a.vy = b.vy; b.vy = t;
+            }
+          }
+        }
+      }
+
+      bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
+
+      if(now - startT < floatDuration){
+        floatAnimHandle = requestAnimationFrame(tick);
+      } else {
+        floatAnimHandle = null;
+        container.style.opacity = 0;
+        setTimeout(()=>{
+          container.querySelectorAll('.wf-word').forEach(el=>el.remove());
+          topText.style.opacity = 1;
+          renderBoard();
+          renderPanel();
+          stage.classList.remove('hidden-stage');
+          submitBtn.disabled = false;
+          updateStats();
+          startPersistentFloat(adjectives);
+        }, 400);
+      }
+    }
+    floatAnimHandle = requestAnimationFrame(tick);
+  });
+}
+
+/* ---------------------------------------------------------------
+   Persistent float: once the dashboard is up, the same characteristic
+   words keep drifting -- confined to the width of the controls panel,
+   filling the remaining vertical space down to the bottom of the
+   viewport -- on independent trajectories, for as long as the trial lasts.
+---------------------------------------------------------------- */
+const PERSIST_SPEED_MIN = 18; // px/s, slower & calmer than the intro
+const PERSIST_SPEED_MAX = 42;
+const PERSIST_MARGIN = 6;
+const CHARFLOAT_SAFETY = 4; // small buffer against rounding, guarantees no scrollbar
+
+function sizeCharFloat(){
+  const zone = document.getElementById('charFloat');
+  if(!zone) return;
+  const rect = zone.getBoundingClientRect();
+  const bodyBottomPad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+  const available = window.innerHeight - rect.top - bodyBottomPad - CHARFLOAT_SAFETY;
+  zone.style.height = Math.max(120, available) + 'px';
+}
+window.addEventListener('resize', sizeCharFloat);
+
+function startPersistentFloat(adjectives){
+  const zone = document.getElementById('charFloat');
+  zone.querySelectorAll('.cf-word').forEach(el=>el.remove());
+  sizeCharFloat();
+
+  const wordEls = adjectives.map(word=>{
+    const el = document.createElement('div');
+    el.className = 'cf-word';
+    el.textContent = word;
+    zone.appendChild(el);
+    return el;
+  });
+
+  requestAnimationFrame(()=>{
+    const rect = zone.getBoundingClientRect();
+    const zw = rect.width, zh = rect.height;
+
+    const bodies = [];
+    wordEls.forEach(el=>{
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      let x, y, tries = 0, ok;
+      do {
+        x = PERSIST_MARGIN + Math.random() * Math.max(1, zw - w - PERSIST_MARGIN*2);
+        y = PERSIST_MARGIN + Math.random() * Math.max(1, zh - h - PERSIST_MARGIN*2);
+        ok = bodiesNonOverlap(x, y, w, h, bodies);
+        tries++;
+      } while(!ok && tries < 40);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = PERSIST_SPEED_MIN + Math.random() * (PERSIST_SPEED_MAX - PERSIST_SPEED_MIN);
+      bodies.push({ el, x, y, w, h, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed });
+    });
+
+    bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
+
+    let lastT = performance.now();
+
+    function tick(now){
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const r = zone.getBoundingClientRect();
+      const zw2 = r.width, zh2 = r.height;
+
+      bodies.forEach(b=>{
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        if(b.x < PERSIST_MARGIN){ b.x = PERSIST_MARGIN; b.vx = Math.abs(b.vx); }
+        if(b.x + b.w > zw2 - PERSIST_MARGIN){ b.x = zw2 - PERSIST_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
+        if(b.y < PERSIST_MARGIN){ b.y = PERSIST_MARGIN; b.vy = Math.abs(b.vy); }
+        if(b.y + b.h > zh2 - PERSIST_MARGIN){ b.y = zh2 - PERSIST_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
+      });
+
+      for(let i=0;i<bodies.length;i++){
+        for(let j=i+1;j<bodies.length;j++){
+          const a = bodies[i], b = bodies[j];
+          const ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2;
+          const dx = bx-ax, dy = by-ay;
+          const minDx = (a.w+b.w)/2 + 6;
+          const minDy = (a.h+b.h)/2 + 6;
+          if(Math.abs(dx) < minDx && Math.abs(dy) < minDy){
+            const overlapX = minDx - Math.abs(dx);
+            const overlapY = minDy - Math.abs(dy);
+            if(overlapX < overlapY){
+              const push = overlapX/2 * (dx < 0 ? -1 : 1);
+              a.x -= push; b.x += push;
+              const t = a.vx; a.vx = b.vx; b.vx = t;
+            } else {
+              const push = overlapY/2 * (dy < 0 ? -1 : 1);
+              a.y -= push; b.y += push;
+              const t = a.vy; a.vy = b.vy; b.vy = t;
+            }
+          }
+        }
+      }
+
+      bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
+      persistentAnimHandle = requestAnimationFrame(tick);
+    }
+    persistentAnimHandle = requestAnimationFrame(tick);
+  });
+}
+
+/* ---------------------------------------------------------------
+   Rendering
+---------------------------------------------------------------- */
+function colorHex(id){
+  if(!id) return DEFAULT_FILL;
+  const c = COLOR_OPTIONS.find(c=>c.id===id);
+  return c ? c.hex : DEFAULT_FILL;
+}
+
+function buildFill(build){
+  const color = colorHex(build.color);
+  if(!build.texture || build.texture === 'plain') return color;
+
+  const safeId = 'pat_' + build.texture + '_' + color.replace('#','');
+  let patternDef = '';
+  if(build.texture === 'striped'){
+    patternDef = `<pattern id="${safeId}" width="14" height="14" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="white"/>
+      <rect x="0" width="6" height="14" fill="${color}"/>
+    </pattern>`;
+  } else if(build.texture === 'dotted'){
+    patternDef = `<pattern id="${safeId}" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="white"/>
+      <circle cx="5" cy="5" r="3.2" fill="${color}"/>
+      <circle cx="15" cy="15" r="3.2" fill="${color}"/>
+    </pattern>`;
+  } else if(build.texture === 'zigzag'){
+    patternDef = `<pattern id="${safeId}" width="16" height="20" patternUnits="userSpaceOnUse">
+      <rect width="16" height="20" fill="white"/>
+      <polyline points="-2,6 2,2 6,6 10,2 14,6 18,2" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="-2,16 2,12 6,16 10,12 14,16 18,12" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </pattern>`;
+  } else if(build.texture === 'checkered'){
+    patternDef = `<pattern id="${safeId}" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="white"/>
+      <rect x="0" y="0" width="8" height="8" fill="${color}"/>
+      <rect x="8" y="8" width="8" height="8" fill="${color}"/>
+    </pattern>`;
+  }
+  return { fill:`url(#${safeId})`, def:patternDef };
+}
+
+// -----------------------------------------------------------------
+// Size model: every shape is drawn from a single circumradius R (its
+// max distance from center, in the 200x200 viewBox). Using the SAME R
+// for every shape means every shape's rotation-safe enclosing square
+// (side 2R) has identical area -- shapes are visually equal-weighted.
+//
+// Size (small/default/large) is just a fixed multiplier on R. Motion is
+// applied in a SEPARATE, outer SVG group in fixed board coordinates (see
+// renderBoard), so a motion's own reach (drift's fixed px sway, pulse's
+// peak scale) never gets multiplied by the size scale. That's what makes
+// it possible to solve for R once, rather than per-motion: we only need
+// BASE_RADIUS small/safe enough that the LARGEST size tier still fits
+// under the SINGLE worst-case motion, and every other (size, motion)
+// combination is then automatically safe too.
+// -----------------------------------------------------------------
+const SIZE_SCALE = { small: 0.62, large: 1.35 }; // "default" (no size chosen) = 1
+const DRIFT_PX = 38;      // driftAnim translateX amplitude, fixed board px
+const PULSE_PEAK = 1.18;  // pulseAnim peak scale multiplier
+const VIEWBOX_HALF = 100;
+const EDGE_PADDING = 4;   // keep a small margin so shapes don't touch the very edge
+const MAX_REACH = VIEWBOX_HALF - EDGE_PADDING;
+
+const BASE_RADIUS = (() => {
+  const largeMult = SIZE_SCALE.large;
+  const SAFETY = 1; // small buffer so the tightest case isn't exactly on the edge
+  const safeReach = MAX_REACH - SAFETY;
+  // Each candidate is "how big can R be so that, at the largest size tier,
+  // this specific motion still keeps the shape within safeReach?"
+  const rFromStillOrRotate = safeReach / largeMult;                 // still/spin/shake: largeMult*R <= safeReach
+  const rFromPulse         = safeReach / (largeMult * PULSE_PEAK);  // pulse: largeMult*R*1.18 <= safeReach
+  const rFromDrift         = (safeReach - DRIFT_PX) / largeMult;    // drift: largeMult*R + 38 <= safeReach
+  return Math.min(rFromStillOrRotate, rFromPulse, rFromDrift);
+})();
+
+function renderBoard(){
+  const build = state.build;
+  const scale = SIZE_SCALE[build.size] || 1; // small/large multiplier, or 1 for default — never depends on motion
+  const R = BASE_RADIUS * scale;
+
+  const motionClass = (build.motion && build.motion !== 'still') ? 'm-'+build.motion : '';
+
+  const fillInfo = buildFill(build);
+  const fill = typeof fillInfo === 'string' ? fillInfo : fillInfo.fill;
+  const patternDef = typeof fillInfo === 'string' ? '' : fillInfo.def;
+
+  const shapeSvg = shapeMarkup(state.target.shape, fill, R);
+
+  document.getElementById('board').innerHTML = `
+    <svg width="100%" height="100%" viewBox="0 0 200 200">
+      <defs>${patternDef}</defs>
+      <g class="${motionClass}">
+        ${shapeSvg}
+      </g>
+    </svg>
+  `;
+}
+
+function renderPanel(){
+  const rows = state.rowOrder.map(catKey=>{
+    const cat = CATEGORIES.find(c=>c.key===catKey);
+    const order = state.optionOrder[catKey];
+    const opts = order.map(optId=>{
+      const opt = cat.options.find(o=>o.id===optId);
+      const selected = state.build[catKey] === optId;
+      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${opt.icon}</button>`;
+    }).join('');
+    return `
+      <div class="row">
+        <div class="row-label">${cat.label}</div>
+        <div class="options">${opts}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('panel').innerHTML = rows;
+}
+
+function render(){
+  renderBoard();
+  renderPanel();
+}
+
+function updateStats(){
+  document.getElementById('statsText').textContent = `Trial ${state.trialCount}`;
+}
+
+newTrial();
+</script>
+</body>
+</html>
