@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shape Match</title>
+<style>
+  :root{
+    --gray-label: #8a8a8a;
+    --gray-line: #e3e3e3;
+    --board-bg: #ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:#ffffff;
+    color:#222;
+    padding:24px 24px 40px;
+  }
+  .wrap{max-width:1150px;width:100%;margin:0 auto;position:relative;}
+
+  .top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .instruction{
+    font-size:20px;
+    line-height:1.5;
+    color:#222;
+    max-width:520px;
+    opacity:0;
+    transition:opacity .25s ease;
+  }
+  .instruction b{font-weight:600;color:#111;}
+  .stats{
+    font-size:13px;
+    color:var(--gray-label);
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  /* centered "hero" sentence shown at the start of each trial, then
+     animated up into the .instruction slot above */
+  .instr-overlay{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    font-size:32px;
+    line-height:1.5;
+    text-align:center;
+    max-width:80vw;
+    color:#222;
+    opacity:0;
+    pointer-events:none;
+    z-index:50;
+    transition:top .85s cubic-bezier(.65,0,.35,1), left .85s cubic-bezier(.65,0,.35,1),
+               font-size .85s cubic-bezier(.65,0,.35,1), opacity .3s ease;
+  }
+  .instr-overlay b{font-weight:600;color:#111;}
+
+  .stage{
+    transition:opacity .4s ease, transform .4s ease;
+  }
+  .stage.hidden-stage{
+    opacity:0;
+    transform:translateY(10px);
+    pointer-events:none;
+  }
+
+  .board-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .board-wrap{
+    width:100%;
+    max-width:420px;
+    aspect-ratio:1 / 1;
+    position:relative;
+  }
+  .board{
+    position:absolute;
+    inset:0;
+    background:var(--board-bg);
+    border:1px solid var(--gray-line);
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:visible;
+    transition:opacity .18s ease;
+  }
+  .board.stim-hidden{ opacity:0; }
+  .board svg{overflow:visible;}
+
+  .board-actions{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease;
+  }
+  .board-actions.active{
+    opacity:1;
+    pointer-events:auto;
+  }
+  button.action{
+    font-family:inherit;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.02em;
+    border-radius:5px;
+    padding:11px 30px;
+    cursor:pointer;
+    transition:opacity .15s ease, transform .08s ease;
+    background:#fff;
+  }
+  button.action:hover{opacity:.85;}
+  button.action:active{transform:translateY(1px);}
+  button.yes{background:#111;color:#fff;border:1.5px solid #111;}
+  button.no{background:#fff;color:#111;border:1.5px solid #111;}
+
+  @media (max-width:640px){
+    .instruction{font-size:17px;}
+    .instr-overlay{font-size:24px;}
+  }
+
+  /* motion animations, applied to the inner <g> that wraps the shape */
+  .m-drift{ animation: driftAnim 2.2s ease-in-out infinite; transform-origin:100px 100px; }
+  .m-spin{ animation: spinAnim 3s linear infinite; transform-origin:100px 100px; }
+  .m-shake{ animation: shakeAnim 0.5s ease-in-out infinite; transform-origin:100px 100px; }
+  .m-pulse{ animation: pulseAnim 1.4s ease-in-out infinite; transform-origin:100px 100px; }
+
+  @keyframes driftAnim{
+    0%{transform:translateX(-38px);}
+    50%{transform:translateX(38px);}
+    100%{transform:translateX(-38px);}
+  }
+  @keyframes spinAnim{
+    from{transform:rotate(0deg);}
+    to{transform:rotate(360deg);}
+  }
+  @keyframes shakeAnim{
+    0%,100%{transform:rotate(-9deg);}
+    50%{transform:rotate(9deg);}
+  }
+  @keyframes pulseAnim{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.18);}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="instr-overlay" id="instrOverlay"></div>
+
+  <div class="top">
+    <div class="instruction" id="instructionText"></div>
+    <div class="stats" id="statsText"></div>
+  </div>
+
+  <div class="board-col stage hidden-stage" id="stage">
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+      <div class="board-actions" id="actions">
+        <button class="action yes" id="yesBtn">Yes</button>
+        <button class="action no" id="noBtn">No</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Config: shapes and the four adjective categories
+---------------------------------------------------------------- */
+const SHAPES = ['circle','square','triangle','diamond','star'];
+
+const COLOR_OPTIONS = [
+  {id:'blue',   hex:'#2196F3'},
+  {id:'green',  hex:'#4CAF50'},
+  {id:'red',    hex:'#E53935'},
+  {id:'orange', hex:'#FFA726'},
+  {id:'pink',   hex:'#EC407A'},
+  {id:'purple', hex:'#8E44AD'}
+];
+const COLOR_IDS = COLOR_OPTIONS.map(c=>c.id);
+
+const SIZE_IDS = ['small','large'];
+const SIZE_ADJ = {small:'small', large:'large'};
+
+const TEXTURE_IDS = ['striped','dotted','zigzag','checkered','plain'];
+const TEXTURE_ADJ = {striped:'striped', dotted:'dotted', zigzag:'zigzag', checkered:'checkered', plain:'plain'};
+
+const MOTION_IDS = ['drift','spin','shake','pulse','still'];
+const MOTION_ADJ = {drift:'drifting', spin:'spinning', shake:'shaking', pulse:'pulsing', still:'still'};
+
+const DEFAULT_FILL = '#171717';
+const FEATURES = ['size','color','texture','motion'];
+
+/* ---------------------------------------------------------------
+   Shape geometry (200x200 viewBox)
+---------------------------------------------------------------- */
+function starPoints(cx,cy,rOuter,rInner,n=5){
+  let pts=[];
+  for(let i=0;i<n*2;i++){
+    const r = i%2===0 ? rOuter : rInner;
+    const a = (Math.PI/n)*i - Math.PI/2;
+    pts.push(`${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+function regularPolygonPoints(cx,cy,r,n){
+  let pts=[];
+  for(let i=0;i<n;i++){
+    const a = -Math.PI/2 + i*(2*Math.PI/n);
+    pts.push(`${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+function colorHex(id){
+  if(!id) return DEFAULT_FILL;
+  const c = COLOR_OPTIONS.find(c=>c.id===id);
+  return c ? c.hex : DEFAULT_FILL;
+}
+function buildFill(build){
+  const color = colorHex(build.color);
+  if(!build.texture || build.texture === 'plain') return color;
+  const safeId = 'pat_' + build.texture + '_' + color.replace('#','');
+  let patternDef = '';
+  if(build.texture === 'striped'){
+    patternDef = `<pattern id="${safeId}" width="14" height="14" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="white"/>
+      <rect x="0" width="6" height="14" fill="${color}"/>
+    </pattern>`;
+  } else if(build.texture === 'dotted'){
+    patternDef = `<pattern id="${safeId}" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="white"/>
+      <circle cx="5" cy="5" r="3.2" fill="${color}"/>
+      <circle cx="15" cy="15" r="3.2" fill="${color}"/>
+    </pattern>`;
+  } else if(build.texture === 'zigzag'){
+    patternDef = `<pattern id="${safeId}" width="16" height="20" patternUnits="userSpaceOnUse">
+      <rect width="16" height="20" fill="white"/>
+      <polyline points="-2,6 2,2 6,6 10,2 14,6 18,2" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="-2,16 2,12 6,16 10,12 14,16 18,12" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </pattern>`;
+  } else if(build.texture === 'checkered'){
+    patternDef = `<pattern id="${safeId}" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="white"/>
+      <rect x="0" y="0" width="8" height="8" fill="${color}"/>
+      <rect x="8" y="8" width="8" height="8" fill="${color}"/>
+    </pattern>`;
+  }
+  return { fill:`url(#${safeId})`, def:patternDef };
+}
+
+const SIZE_SCALE = { small: 0.62, large: 1.35 }; // no size chosen yet = 1
+const DRIFT_PX = 38;
+const PULSE_PEAK = 1.18;
+const VIEWBOX_HALF = 100;
+const EDGE_PADDING = 4;
+const MAX_REACH = VIEWBOX_HALF - EDGE_PADDING;
+const BASE_RADIUS = (() => {
+  const largeMult = SIZE_SCALE.large;
+  const SAFETY = 1;
+  const safeReach = MAX_REACH - SAFETY;
+  const rFromStillOrRotate = safeReach / largeMult;
+  const rFromPulse         = safeReach / (largeMult * PULSE_PEAK);
+  const rFromDrift         = (safeReach - DRIFT_PX) / largeMult;
+  return Math.min(rFromStillOrRotate, rFromPulse, rFromDrift);
+})();
+
+/* ---------------------------------------------------------------
+   Rendering: the SVG structure (defs + motion group + shape element)
+   is built ONCE per trial via initBoard(), then every subsequent
+   feature reveal calls updateBoard() which only mutates attributes
+   in place -- so a running motion animation is never interrupted by
+   later feature reveals.
+---------------------------------------------------------------- */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+let boardState = { g:null, shapeEl:null, defsEl:null };
+
+function createShapeEl(shapeType){
+  if(shapeType==='circle') return document.createElementNS(SVG_NS,'circle');
+  if(shapeType==='square') return document.createElementNS(SVG_NS,'rect');
+  return document.createElementNS(SVG_NS,'polygon'); // triangle, diamond, star
+}
+
+function initBoard(shapeType){
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 200 200"><defs></defs><g></g></svg>`;
+  const defsEl = boardEl.querySelector('defs');
+  const g = boardEl.querySelector('g');
+  const shapeEl = createShapeEl(shapeType);
+  g.appendChild(shapeEl);
+  boardState = { g, shapeEl, defsEl, shapeType };
+}
+
+function updateGeometry(R){
+  const { shapeType, shapeEl } = boardState;
+  if(shapeType==='circle'){
+    shapeEl.setAttribute('cx',100); shapeEl.setAttribute('cy',100); shapeEl.setAttribute('r', R.toFixed(2));
+  } else if(shapeType==='square'){
+    const hw = R / Math.SQRT2;
+    const rx = Math.max(2, hw * 0.11);
+    shapeEl.setAttribute('x',(100-hw).toFixed(2));
+    shapeEl.setAttribute('y',(100-hw).toFixed(2));
+    shapeEl.setAttribute('width',(hw*2).toFixed(2));
+    shapeEl.setAttribute('height',(hw*2).toFixed(2));
+    shapeEl.setAttribute('rx', rx.toFixed(2));
+  } else if(shapeType==='triangle'){
+    shapeEl.setAttribute('points', regularPolygonPoints(100,100,R,3));
+  } else if(shapeType==='diamond'){
+    shapeEl.setAttribute('points', `100,${(100-R).toFixed(2)} ${(100+R).toFixed(2)},100 100,${(100+R).toFixed(2)} ${(100-R).toFixed(2)},100`);
+  } else if(shapeType==='star'){
+    shapeEl.setAttribute('points', starPoints(100,100,R,R*0.4));
+  }
+}
+
+function updateFill(build){
+  const fillInfo = buildFill(build);
+  const fill = typeof fillInfo === 'string' ? fillInfo : fillInfo.fill;
+  const patternDef = typeof fillInfo === 'string' ? '' : fillInfo.def;
+  boardState.defsEl.innerHTML = patternDef;
+  boardState.shapeEl.setAttribute('fill', fill);
+  const hasPattern = build.texture && build.texture !== 'plain';
+  if(hasPattern){
+    boardState.shapeEl.setAttribute('stroke', '#000');
+    boardState.shapeEl.setAttribute('stroke-width', '0.5');
+    boardState.shapeEl.setAttribute('stroke-opacity', '0.2');
+  } else {
+    boardState.shapeEl.removeAttribute('stroke');
+    boardState.shapeEl.removeAttribute('stroke-width');
+    boardState.shapeEl.removeAttribute('stroke-opacity');
+  }
+}
+
+function updateMotion(build){
+  const motionClass = (build.motion && build.motion !== 'still') ? 'm-'+build.motion : '';
+  if(boardState.g.getAttribute('class') !== motionClass){
+    boardState.g.setAttribute('class', motionClass);
+  }
+}
+
+function updateBoard(build){
+  const scale = build.size ? SIZE_SCALE[build.size] : 1;
+  const R = BASE_RADIUS * scale;
+  updateGeometry(R);
+  updateFill(build);
+  updateMotion(build);
+}
+
+/* ---------------------------------------------------------------
+   Trial generation & sentence text
+---------------------------------------------------------------- */
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function randomStimulus(){
+  return {
+    shape: pickRandom(SHAPES),
+    size: pickRandom(SIZE_IDS),
+    color: pickRandom(COLOR_IDS),
+    texture: pickRandom(TEXTURE_IDS),
+    motion: pickRandom(MOTION_IDS)
+  };
+}
+function sameStimulus(a,b){
+  return a.shape===b.shape && a.size===b.size && a.color===b.color &&
+         a.texture===b.texture && a.motion===b.motion;
+}
+function adjectiveFor(key, target){
+  if(key==='size') return SIZE_ADJ[target.size];
+  if(key==='color') return target.color;
+  if(key==='texture') return TEXTURE_ADJ[target.texture];
+  return MOTION_ADJ[target.motion];
+}
+function buildPromptHTML(target, adjOrder){
+  const words = adjOrder.map(k=>adjectiveFor(k, target));
+  const article = /^[aeiou]/i.test(words[0]) ? 'an' : 'a';
+  return `Is this ${article} <b>${words.join('</b>, <b>')}</b> <b>${target.shape}</b>?`;
+}
+
+/* ---------------------------------------------------------------
+   Timing
+---------------------------------------------------------------- */
+const STAGE_MS = 550;       // time between each feature reveal
+const HOLD_MS = 650;        // full stimulus stays visible this long once complete
+const PROCESSING_MS = 300;  // gap between stimulus offset and response options
+const ISI_MS = 700;         // blank gap between trials
+const MOVE_MS = 850;        // duration of the sentence's glide-up animation
+const READING_WPM = 220;    // average adult silent-reading speed
+const MIN_READ_MS = 1400;   // floor so even a short sentence doesn't flash by
+
+function readingTimeMs(text){
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(MIN_READ_MS, Math.round(words / READING_WPM * 60 * 1000));
+}
+
+let trialIndex = 0;
+let log = [];
+let currentTrial = null;
+let buttonsShownAt = 0;
+let awaitingResponse = false;
+let timers = [];
+
+function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers = []; }
+function after(ms, fn){ const t = setTimeout(fn, ms); timers.push(t); return t; }
+
+function generateTrial(){
+  const target = randomStimulus();
+  const adjOrder = shuffle(['size','color','texture','motion']);
+  const promptHTML = buildPromptHTML(target, adjOrder);
+
+  const isMatch = Math.random() < 0.5;
+  let displayState;
+  if(isMatch){
+    displayState = { ...target };
+  } else {
+    do { displayState = randomStimulus(); } while(sameStimulus(displayState, target));
+  }
+
+  // the shape itself is visible from the first frame of the build (neutral
+  // size, black fill); only these four adjective features get staged in,
+  // either in the order the prompt read them or a fresh random order
+  const buildOrder = Math.random() < 0.5 ? adjOrder : shuffle(FEATURES.slice());
+
+  return { target, displayState, promptHTML, isMatch, buildOrder };
+}
+
+function startTrial(){
+  clearTimers();
+  awaitingResponse = false;
+  currentTrial = generateTrial();
+  trialIndex++;
+  runTrialIntro();
+}
+
+/* ---------------------------------------------------------------
+   Trial intro: sentence appears centered on screen, then glides up
+   into the .instruction slot; the board fades in once it lands.
+---------------------------------------------------------------- */
+function runTrialIntro(){
+  const stage = document.getElementById('stage');
+  const overlay = document.getElementById('instrOverlay');
+  const topText = document.getElementById('instructionText');
+  const boardEl = document.getElementById('board');
+  const actionsEl = document.getElementById('actions');
+
+  stage.classList.add('hidden-stage');
+  actionsEl.classList.remove('active');
+  boardEl.classList.remove('stim-hidden');
+  boardEl.innerHTML = '';
+
+  const html = currentTrial.promptHTML;
+  const plainText = html.replace(/<[^>]+>/g,'');
+  topText.innerHTML = html;
+  topText.style.opacity = 0;
+
+  overlay.innerHTML = html;
+  overlay.style.transition = 'none';
+  overlay.style.top = '50%';
+  overlay.style.left = '50%';
+  overlay.style.fontSize = '32px';
+  overlay.style.opacity = 1;
+  overlay.offsetHeight; // force reflow so "none" applies before re-enabling transition
+  overlay.style.transition = '';
+
+  after(readingTimeMs(plainText), () => {
+    const rect = topText.getBoundingClientRect();
+    const targetFontSize = parseFloat(getComputedStyle(topText).fontSize);
+    overlay.style.top = (rect.top + rect.height/2) + 'px';
+    overlay.style.left = (rect.left + rect.width/2) + 'px';
+    overlay.style.fontSize = targetFontSize + 'px';
+
+    after(MOVE_MS, () => {
+      overlay.style.opacity = 0;
+      topText.style.opacity = 1;
+      stage.classList.remove('hidden-stage');
+      document.getElementById('statsText').textContent = `Trial ${trialIndex}`;
+      beginBuild();
+    });
+  });
+}
+
+function beginBuild(){
+  const boardEl = document.getElementById('board');
+
+  // stimulus starts as its shape at neutral size in black; the SVG
+  // structure is created once here and mutated in place from now on
+  // so a running motion never gets reset by later feature reveals
+  initBoard(currentTrial.displayState.shape);
+  let building = { shape: currentTrial.displayState.shape };
+  updateBoard(building);
+
+  currentTrial.buildOrder.forEach((feature, i) => {
+    after(STAGE_MS * (i+1), () => {
+      building = { ...building, [feature]: currentTrial.displayState[feature] };
+      updateBoard(building);
+    });
+  });
+
+  const totalBuildTime = STAGE_MS * currentTrial.buildOrder.length;
+
+  after(totalBuildTime + HOLD_MS, () => {
+    boardEl.classList.add('stim-hidden');
+  });
+
+  after(totalBuildTime + HOLD_MS + PROCESSING_MS, () => {
+    document.getElementById('actions').classList.add('active');
+    buttonsShownAt = performance.now();
+    awaitingResponse = true;
+  });
+}
+
+function respond(answer){
+  if(!awaitingResponse) return;
+  awaitingResponse = false;
+  const rt = Math.round(performance.now() - buttonsShownAt);
+  const correctAnswer = currentTrial.isMatch ? 'yes' : 'no';
+  const correct = answer === correctAnswer;
+
+  log.push({
+    trial: trialIndex,
+    prompt: currentTrial.promptHTML.replace(/<\/?b>/g,''),
+    match: currentTrial.isMatch,
+    response: answer,
+    correct: correct,
+    rt: rt
+  });
+
+  document.getElementById('actions').classList.remove('active');
+
+  after(ISI_MS, startTrial);
+}
+
+document.getElementById('yesBtn').addEventListener('click', ()=>respond('yes'));
+document.getElementById('noBtn').addEventListener('click', ()=>respond('no'));
+
+startTrial();
+</script>
+</body>
+</html>
