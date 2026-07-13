@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Sentence Task</title>
+<title>Shape Builder</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -72,16 +72,46 @@
     pointer-events:none;
   }
 
-  .layout{
-    display:flex;
-    gap:48px;
-    align-items:flex-start;
-    flex-wrap:wrap;
+  .stage-grid{
+    display:grid;
+    grid-template-columns: max-content 1fr max-content;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "tl . tr"
+      ". center ."
+      "bl . br";
+    column-gap:32px;
+    row-gap:28px;
+    align-items:start;
   }
-  .board-col{flex:1.6 1 340px;}
+  .corner-tl{grid-area:tl;}
+  .corner-tr{grid-area:tr;}
+  .corner-bl{grid-area:bl; align-self:end;}
+  .corner-br{grid-area:br; align-self:end;}
+  .corner-tr, .corner-br{text-align:right;}
+  .corner-label{
+    color:var(--gray-label);
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .corner-options{
+    display:flex;
+    gap:10px;
+    flex-wrap:nowrap;
+  }
+  .corner-tr .corner-options, .corner-br .corner-options{
+    justify-content:flex-end;
+  }
+
+  .center-area{
+    grid-area:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
   .board{
     width:100%;
-    max-width:520px;
+    max-width:420px;
     aspect-ratio:1 / 1;
     background:var(--board-bg);
     border:1px solid var(--gray-line);
@@ -111,25 +141,6 @@
   button.action:hover{opacity:.85;}
   button.submit{background:#111;color:#fff;}
 
-  .panel{flex:1 1 300px;min-width:300px;max-width:380px;}
-  .row{
-    display:flex;
-    align-items:center;
-    padding:14px 0;
-    border-bottom:1px solid var(--gray-line);
-  }
-  .row:first-child{border-top:1px solid var(--gray-line);}
-  .row-label{
-    width:78px;
-    flex:0 0 78px;
-    color:var(--gray-label);
-    font-size:16px;
-  }
-  .options{
-    display:flex;
-    gap:10px;
-    flex-wrap:nowrap;
-  }
   .opt{
     background:none;
     border:2px solid transparent;
@@ -151,8 +162,17 @@
   }
 
   @media (max-width:640px){
-    .layout{gap:28px;}
-    .row-label{width:72px;flex:0 0 72px;font-size:14px;}
+    .stage-grid{
+      display:flex;
+      flex-direction:column;
+      gap:24px;
+    }
+    .corner-tl, .corner-tr, .corner-bl, .corner-br{
+      text-align:left;
+    }
+    .corner-tr .corner-options, .corner-br .corner-options{
+      justify-content:flex-start;
+    }
     .instr-overlay{font-size:24px;}
   }
 
@@ -190,15 +210,19 @@
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="layout stage hidden-stage" id="stage">
-    <div class="board-col">
+  <div class="stage-grid stage hidden-stage" id="stage">
+    <div class="corner corner-tl" id="corner-tl"></div>
+    <div class="corner corner-tr" id="corner-tr"></div>
+
+    <div class="center-area">
       <div class="board" id="board"></div>
       <div class="board-actions">
         <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
       </div>
     </div>
 
-    <div class="panel" id="panel"></div>
+    <div class="corner corner-bl" id="corner-bl"></div>
+    <div class="corner corner-br" id="corner-br"></div>
   </div>
 </div>
 
@@ -418,10 +442,13 @@ let state = {
   target: null,
   build: { size:null, color:null, texture:null, motion:null },
   rowOrder: [],
+  cornerOf: {},
   optionOrder: {},
   sentenceOrder: [],
   trialCount: 0
 };
+
+const CORNER_IDS = ['tl','tr','bl','br'];
 
 const MOVE_MS = 850;      // duration of the glide-up animation
 const READING_WPM = 220;  // average adult silent-reading speed
@@ -461,7 +488,15 @@ function newTrial(){
 
   state.target = target;
   state.build = { size:null, color:null, texture:null, motion:null };
+
+  // which corner each characteristic (size/color/texture/motion) appears in,
+  // re-randomized every trial
   state.rowOrder = shuffle(CATEGORIES.map(c=>c.key));
+  state.cornerOf = {};
+  state.rowOrder.forEach((catKey, i)=>{ state.cornerOf[catKey] = CORNER_IDS[i]; });
+
+  // order of the OPTIONS within each characteristic -- independent of which
+  // corner the characteristic landed in, re-randomized every trial
   state.optionOrder = {};
   CATEGORIES.forEach(cat=>{
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
@@ -521,7 +556,7 @@ function runTrialIntro(){
       overlay.style.opacity = 0;
       topText.style.opacity = 1;
       renderBoard();
-      renderPanel();
+      renderCorners();
       stage.classList.remove('hidden-stage');
       submitBtn.disabled = false;
       updateStats();
@@ -630,28 +665,27 @@ function renderBoard(){
   `;
 }
 
-function renderPanel(){
-  const rows = state.rowOrder.map(catKey=>{
-    const cat = CATEGORIES.find(c=>c.key===catKey);
+function renderCorners(){
+  CATEGORIES.forEach(cat=>{
+    const catKey = cat.key;
     const order = state.optionOrder[catKey];
     const opts = order.map(optId=>{
       const opt = cat.options.find(o=>o.id===optId);
       const selected = state.build[catKey] === optId;
       return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${opt.icon}</button>`;
     }).join('');
-    return `
-      <div class="row">
-        <div class="row-label">${cat.label}</div>
-        <div class="options">${opts}</div>
-      </div>
+    const corner = state.cornerOf[catKey];
+    const el = document.getElementById('corner-' + corner);
+    el.innerHTML = `
+      <div class="corner-label">${cat.label}</div>
+      <div class="corner-options">${opts}</div>
     `;
-  }).join('');
-  document.getElementById('panel').innerHTML = rows;
+  });
 }
 
 function render(){
   renderBoard();
-  renderPanel();
+  renderCorners();
 }
 
 function updateStats(){
