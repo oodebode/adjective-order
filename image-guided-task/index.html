@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Image Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -27,30 +27,11 @@
     flex-wrap:wrap;
     gap:12px;
   }
-  .prompt-block{
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
   .prompt-label{
     font-size:20px;
     line-height:1.5;
     color:#222;
   }
-  .reference-box{
-    width:64px;
-    height:64px;
-    flex:0 0 auto;
-    border:1px solid var(--gray-line);
-    border-radius:8px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:visible;
-    opacity:0;
-    transition:opacity .25s ease;
-  }
-  .reference-box svg{overflow:visible;}
   .stats{
     font-size:13px;
     color:var(--gray-label);
@@ -58,54 +39,63 @@
     white-space:nowrap;
   }
 
-  /* centered "hero" shape shown at the start of each trial, then
-     animated + shrunk into the .reference-box slot above */
-  .instr-overlay{
-    position:fixed;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    width:220px;
-    height:220px;
-    opacity:0;
-    pointer-events:none;
-    z-index:50;
-    transition:top .85s cubic-bezier(.65,0,.35,1), left .85s cubic-bezier(.65,0,.35,1),
-               width .85s cubic-bezier(.65,0,.35,1), height .85s cubic-bezier(.65,0,.35,1), opacity .3s ease;
+  .stage-grid{
+    display:grid;
+    grid-template-columns: max-content 1fr max-content;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "tl . tr"
+      ". center ."
+      "bl . br";
+    column-gap:32px;
+    row-gap:28px;
+    align-items:start;
   }
-  .instr-overlay svg{width:100%;height:100%;overflow:visible;}
-  .overlay-caption{
-    position:fixed;
-    top:calc(50% - 150px);
-    left:50%;
-    transform:translate(-50%,-50%);
-    font-size:20px;
+  .corner-tl{grid-area:tl;}
+  .corner-tr{grid-area:tr;}
+  .corner-bl{grid-area:bl; align-self:end;}
+  .corner-br{grid-area:br; align-self:end;}
+  .corner-tr, .corner-br{text-align:right;}
+  .corner-label{
     color:var(--gray-label);
-    opacity:0;
-    pointer-events:none;
-    z-index:50;
-    transition:opacity .3s ease;
+    font-size:14px;
+    margin-bottom:10px;
   }
-
-  .stage{
-    transition:opacity .4s ease, transform .4s ease;
-  }
-  .stage.hidden-stage{
-    opacity:0;
-    transform:translateY(10px);
-    pointer-events:none;
-  }
-
-  .layout{
+  .corner-options{
     display:flex;
-    gap:48px;
-    align-items:flex-start;
-    flex-wrap:wrap;
+    gap:10px;
+    flex-wrap:nowrap;
   }
-  .board-col{flex:1.6 1 340px;}
-  .board{
+  .corner-tr .corner-options, .corner-br .corner-options{
+    justify-content:flex-end;
+  }
+
+  .center-area{
+    grid-area:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .box-pair{
+    display:flex;
+    gap:20px;
     width:100%;
     max-width:520px;
+  }
+  .box-unit{
+    flex:1 1 0;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+  }
+  .box-caption{
+    font-size:13px;
+    color:var(--gray-label);
+  }
+  .box{
+    width:100%;
     aspect-ratio:1 / 1;
     background:var(--board-bg);
     border:1px solid var(--gray-line);
@@ -115,7 +105,7 @@
     justify-content:center;
     overflow:visible;
   }
-  .board svg{overflow:visible;}
+  .box svg{overflow:visible;}
   .board-actions{
     display:flex;
     gap:10px;
@@ -135,25 +125,6 @@
   button.action:hover{opacity:.85;}
   button.submit{background:#111;color:#fff;}
 
-  .panel{flex:1 1 300px;min-width:300px;max-width:380px;}
-  .row{
-    display:flex;
-    align-items:center;
-    padding:14px 0;
-    border-bottom:1px solid var(--gray-line);
-  }
-  .row:first-child{border-top:1px solid var(--gray-line);}
-  .row-label{
-    width:78px;
-    flex:0 0 78px;
-    color:var(--gray-label);
-    font-size:16px;
-  }
-  .options{
-    display:flex;
-    gap:10px;
-    flex-wrap:nowrap;
-  }
   .opt{
     background:none;
     border:2px solid transparent;
@@ -175,9 +146,18 @@
   }
 
   @media (max-width:640px){
-    .layout{gap:28px;}
-    .row-label{width:72px;flex:0 0 72px;font-size:14px;}
-    .instr-overlay{width:160px;height:160px;}
+    .stage-grid{
+      display:flex;
+      flex-direction:column;
+      gap:24px;
+    }
+    .corner-tl, .corner-tr, .corner-bl, .corner-br{
+      text-align:left;
+    }
+    .corner-tr .corner-options, .corner-br .corner-options{
+      justify-content:flex-start;
+    }
+    .box-pair{gap:12px;}
   }
 
   /* motion animations, applied to the inner <g> that wraps the shape */
@@ -207,26 +187,33 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="instr-overlay" id="instrOverlay"></div>
-  <div class="overlay-caption" id="overlayCaption">Build this shape:</div>
-
   <div class="top">
-    <div class="prompt-block">
-      <div class="prompt-label">Build this shape:</div>
-      <div class="reference-box" id="referenceBox"></div>
-    </div>
+    <div class="prompt-label">Match this shape:</div>
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="layout stage hidden-stage" id="stage">
-    <div class="board-col">
-      <div class="board" id="board"></div>
+  <div class="stage-grid" id="stage">
+    <div class="corner corner-tl" id="corner-tl"></div>
+    <div class="corner corner-tr" id="corner-tr"></div>
+
+    <div class="center-area">
+      <div class="box-pair">
+        <div class="box-unit">
+          <div class="box" id="targetBox"></div>
+          <div class="box-caption">Target</div>
+        </div>
+        <div class="box-unit">
+          <div class="box" id="board"></div>
+          <div class="box-caption">Yours</div>
+        </div>
+      </div>
       <div class="board-actions">
         <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
       </div>
     </div>
 
-    <div class="panel" id="panel"></div>
+    <div class="corner corner-bl" id="corner-bl"></div>
+    <div class="corner corner-br" id="corner-br"></div>
   </div>
 </div>
 
@@ -446,12 +433,12 @@ let state = {
   target: null,
   build: { size:null, color:null, texture:null, motion:null },
   rowOrder: [],
+  cornerOf: {},
   optionOrder: {},
   trialCount: 0
 };
 
-const MOVE_MS = 850;      // duration of the shrink-and-move animation
-const VIEW_MS = 1600;     // how long the hero shape holds centered before it travels
+const CORNER_IDS = ['tl','tr','bl','br'];
 
 function shuffle(arr){
   const a = arr.slice();
@@ -473,7 +460,15 @@ function newTrial(){
 
   state.target = target;
   state.build = { size:null, color:null, texture:null, motion:null };
+
+  // which corner each characteristic (size/color/texture/motion) appears in,
+  // re-randomized every trial
   state.rowOrder = shuffle(CATEGORIES.map(c=>c.key));
+  state.cornerOf = {};
+  state.rowOrder.forEach((catKey, i)=>{ state.cornerOf[catKey] = CORNER_IDS[i]; });
+
+  // order of the OPTIONS within each characteristic -- independent of which
+  // corner the characteristic landed in, re-randomized every trial
   state.optionOrder = {};
   CATEGORIES.forEach(cat=>{
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
@@ -493,59 +488,14 @@ function selectOption(catKey, optId){
 }
 
 /* ---------------------------------------------------------------
-   Trial intro: target shape appears large & centered on screen
-   (fully animated, at true target size/color/texture), then shrinks
-   and travels into the .reference-box slot up top; board/panel fade
-   in once it lands. The reference box stays visible for the whole
-   trial so the shape can be copied by eye.
+   Trial start: target box and build box both populate immediately
+   and stay on screen for the whole trial, side by side.
 ---------------------------------------------------------------- */
 function runTrialIntro(){
-  const stage = document.getElementById('stage');
-  const submitBtn = document.getElementById('submitBtn');
-  const overlay = document.getElementById('instrOverlay');
-  const caption = document.getElementById('overlayCaption');
-  const refBox = document.getElementById('referenceBox');
-
-  stage.classList.add('hidden-stage');
-  submitBtn.disabled = true;
-  refBox.style.opacity = 0;
-  refBox.innerHTML = '';
-
-  const markup = targetMarkup(state.target);
-
-  overlay.innerHTML = markup;
-  overlay.style.transition = 'none';
-  overlay.style.top = '50%';
-  overlay.style.left = '50%';
-  overlay.style.width = '220px';
-  overlay.style.height = '220px';
-  overlay.style.opacity = 1;
-  // force reflow so the "none" transition actually applies before we re-enable it
-  overlay.offsetHeight;
-  overlay.style.transition = '';
-  caption.style.opacity = 1;
-
-  // hold the shape centered long enough to study it, THEN shrink it
-  // down into the reference box
-  setTimeout(()=>{
-    const rect = refBox.getBoundingClientRect();
-    overlay.style.top = (rect.top + rect.height/2) + 'px';
-    overlay.style.left = (rect.left + rect.width/2) + 'px';
-    overlay.style.width = rect.width + 'px';
-    overlay.style.height = rect.height + 'px';
-    caption.style.opacity = 0;
-
-    setTimeout(()=>{
-      overlay.style.opacity = 0;
-      refBox.innerHTML = markup;
-      refBox.style.opacity = 1;
-      renderBoard();
-      renderPanel();
-      stage.classList.remove('hidden-stage');
-      submitBtn.disabled = false;
-      updateStats();
-    }, MOVE_MS);
-  }, VIEW_MS);
+  document.getElementById('targetBox').innerHTML = targetMarkup(state.target);
+  renderBoard();
+  renderCorners();
+  updateStats();
 }
 
 /* ---------------------------------------------------------------
@@ -676,28 +626,27 @@ function targetMarkup(target){
   `;
 }
 
-function renderPanel(){
-  const rows = state.rowOrder.map(catKey=>{
-    const cat = CATEGORIES.find(c=>c.key===catKey);
+function renderCorners(){
+  CATEGORIES.forEach(cat=>{
+    const catKey = cat.key;
     const order = state.optionOrder[catKey];
     const opts = order.map(optId=>{
       const opt = cat.options.find(o=>o.id===optId);
       const selected = state.build[catKey] === optId;
       return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${opt.icon}</button>`;
     }).join('');
-    return `
-      <div class="row">
-        <div class="row-label">${cat.label}</div>
-        <div class="options">${opts}</div>
-      </div>
+    const corner = state.cornerOf[catKey];
+    const el = document.getElementById('corner-' + corner);
+    el.innerHTML = `
+      <div class="corner-label">${cat.label}</div>
+      <div class="corner-options">${opts}</div>
     `;
-  }).join('');
-  document.getElementById('panel').innerHTML = rows;
+  });
 }
 
 function render(){
   renderBoard();
-  renderPanel();
+  renderCorners();
 }
 
 function updateStats(){
