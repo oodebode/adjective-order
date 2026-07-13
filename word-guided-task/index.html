@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Task</title>
+<title>Shape Builder</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -76,14 +76,18 @@
     white-space:nowrap;
   }
 
-  /* persistent zone below the board: the same characteristic words keep
-     drifting here, on their own trajectories, once the dashboard is up */
-  .characteristics-float{
+  /* persistent zone overlaying the display box: the same characteristic
+     words keep drifting here, around the shape, once the dashboard is up */
+  .board-wrap{
     position:relative;
     width:100%;
-    height:80px; /* fallback; actual height is set by JS to fill remaining viewport space */
-    margin-top:28px;
+    max-width:420px;
+  }
+  .characteristics-float{
+    position:absolute;
+    inset:0;
     overflow:hidden;
+    pointer-events:none;
   }
   .cf-word{
     position:absolute;
@@ -108,16 +112,46 @@
     pointer-events:none;
   }
 
-  .layout{
-    display:flex;
-    gap:48px;
-    align-items:flex-start;
-    flex-wrap:wrap;
+  .stage-grid{
+    display:grid;
+    grid-template-columns: max-content 1fr max-content;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "tl . tr"
+      ". center ."
+      "bl . br";
+    column-gap:32px;
+    row-gap:28px;
+    align-items:start;
   }
-  .board-col{flex:1.6 1 340px;}
+  .corner-tl{grid-area:tl;}
+  .corner-tr{grid-area:tr;}
+  .corner-bl{grid-area:bl; align-self:end;}
+  .corner-br{grid-area:br; align-self:end;}
+  .corner-tr, .corner-br{text-align:right;}
+  .corner-label{
+    color:var(--gray-label);
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .corner-options{
+    display:flex;
+    gap:10px;
+    flex-wrap:nowrap;
+  }
+  .corner-tr .corner-options, .corner-br .corner-options{
+    justify-content:flex-end;
+  }
+
+  .center-area{
+    grid-area:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
   .board{
     width:100%;
-    max-width:520px;
+    max-width:420px;
     aspect-ratio:1 / 1;
     background:var(--board-bg);
     border:1px solid var(--gray-line);
@@ -147,26 +181,6 @@
   button.action:hover{opacity:.85;}
   button.submit{background:#111;color:#fff;}
 
-  .panel-col{flex:1 1 300px;min-width:300px;max-width:380px;}
-  .panel{}
-  .row{
-    display:flex;
-    align-items:center;
-    padding:14px 0;
-    border-bottom:1px solid var(--gray-line);
-  }
-  .row:first-child{border-top:1px solid var(--gray-line);}
-  .row-label{
-    width:78px;
-    flex:0 0 78px;
-    color:var(--gray-label);
-    font-size:16px;
-  }
-  .options{
-    display:flex;
-    gap:10px;
-    flex-wrap:nowrap;
-  }
   .opt{
     background:none;
     border:2px solid transparent;
@@ -188,8 +202,17 @@
   }
 
   @media (max-width:640px){
-    .layout{gap:28px;}
-    .row-label{width:72px;flex:0 0 72px;font-size:14px;}
+    .stage-grid{
+      display:flex;
+      flex-direction:column;
+      gap:24px;
+    }
+    .corner-tl, .corner-tr, .corner-bl, .corner-br{
+      text-align:left;
+    }
+    .corner-tr .corner-options, .corner-br .corner-options{
+      justify-content:flex-start;
+    }
     .wf-heading{font-size:20px;}
     .wf-word{font-size:18px;}
   }
@@ -230,18 +253,22 @@
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="layout stage hidden-stage" id="stage">
-    <div class="board-col">
-      <div class="board" id="board"></div>
+  <div class="stage-grid stage hidden-stage" id="stage">
+    <div class="corner corner-tl" id="corner-tl"></div>
+    <div class="corner corner-tr" id="corner-tr"></div>
+
+    <div class="center-area">
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+        <div class="characteristics-float" id="charFloat"></div>
+      </div>
       <div class="board-actions">
         <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
       </div>
     </div>
 
-    <div class="panel-col">
-      <div class="panel" id="panel"></div>
-      <div class="characteristics-float" id="charFloat"></div>
-    </div>
+    <div class="corner corner-bl" id="corner-bl"></div>
+    <div class="corner corner-br" id="corner-br"></div>
   </div>
 </div>
 
@@ -461,10 +488,13 @@ let state = {
   target: null,
   build: { size:null, color:null, texture:null, motion:null },
   rowOrder: [],
+  cornerOf: {},
   optionOrder: {},
   sentenceOrder: [],
   trialCount: 0
 };
+
+const CORNER_IDS = ['tl','tr','bl','br'];
 
 const MOVE_MS = 850;      // duration of the glide-up animation
 const READING_WPM = 220;  // average adult silent-reading speed
@@ -504,7 +534,15 @@ function newTrial(){
 
   state.target = target;
   state.build = { size:null, color:null, texture:null, motion:null };
+
+  // which corner each characteristic (size/color/texture/motion) appears in,
+  // re-randomized every trial
   state.rowOrder = shuffle(CATEGORIES.map(c=>c.key));
+  state.cornerOf = {};
+  state.rowOrder.forEach((catKey, i)=>{ state.cornerOf[catKey] = CORNER_IDS[i]; });
+
+  // order of the OPTIONS within each characteristic -- independent of which
+  // corner the characteristic landed in, re-randomized every trial
   state.optionOrder = {};
   CATEGORIES.forEach(cat=>{
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
@@ -669,7 +707,7 @@ function runTrialIntro(){
           container.querySelectorAll('.wf-word').forEach(el=>el.remove());
           topText.style.opacity = 1;
           renderBoard();
-          renderPanel();
+          renderCorners();
           stage.classList.remove('hidden-stage');
           submitBtn.disabled = false;
           updateStats();
@@ -683,29 +721,30 @@ function runTrialIntro(){
 
 /* ---------------------------------------------------------------
    Persistent float: once the dashboard is up, the same characteristic
-   words keep drifting -- confined to the width of the controls panel,
-   filling the remaining vertical space down to the bottom of the
-   viewport -- on independent trajectories, for as long as the trial lasts.
+   words keep drifting -- confined to the display box around the shape,
+   on independent trajectories, for as long as the trial lasts.
 ---------------------------------------------------------------- */
 const PERSIST_SPEED_MIN = 18; // px/s, slower & calmer than the intro
 const PERSIST_SPEED_MAX = 42;
 const PERSIST_MARGIN = 6;
-const CHARFLOAT_SAFETY = 4; // small buffer against rounding, guarantees no scrollbar
+const SHAPE_MARGIN = 10; // gap words keep from the shape's edge when they bounce off it
 
-function sizeCharFloat(){
-  const zone = document.getElementById('charFloat');
-  if(!zone) return;
-  const rect = zone.getBoundingClientRect();
-  const bodyBottomPad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
-  const available = window.innerHeight - rect.top - bodyBottomPad - CHARFLOAT_SAFETY;
-  zone.style.height = Math.max(120, available) + 'px';
+// current shape's circular footprint inside the display box, in pixels --
+// mirrors the board's own R-based sizing (BASE_RADIUS/SIZE_SCALE) plus
+// each motion's own reach (drift's sway, pulse's peak scale), so words
+// bounce off the shape's true edge, live, as size/motion selections change
+function shapeCirclePx(zw, zh){
+  const scalePx = zw / 200; // board's SVG viewBox is 200x200
+  const sizeScale = SIZE_SCALE[state.build.size] || 1;
+  let r = BASE_RADIUS * sizeScale;
+  if(state.build.motion === 'drift') r += DRIFT_PX;
+  else if(state.build.motion === 'pulse') r *= PULSE_PEAK;
+  return { cx: zw/2, cy: zh/2, r: r * scalePx };
 }
-window.addEventListener('resize', sizeCharFloat);
 
 function startPersistentFloat(adjectives){
   const zone = document.getElementById('charFloat');
   zone.querySelectorAll('.cf-word').forEach(el=>el.remove());
-  sizeCharFloat();
 
   const wordEls = adjectives.map(word=>{
     const el = document.createElement('div');
@@ -718,16 +757,21 @@ function startPersistentFloat(adjectives){
   requestAnimationFrame(()=>{
     const rect = zone.getBoundingClientRect();
     const zw = rect.width, zh = rect.height;
+    const shape0 = shapeCirclePx(zw, zh);
 
     const bodies = [];
     wordEls.forEach(el=>{
       const w = el.offsetWidth;
       const h = el.offsetHeight;
+      const wordR = Math.max(w, h) / 2;
       let x, y, tries = 0, ok;
       do {
         x = PERSIST_MARGIN + Math.random() * Math.max(1, zw - w - PERSIST_MARGIN*2);
         y = PERSIST_MARGIN + Math.random() * Math.max(1, zh - h - PERSIST_MARGIN*2);
-        ok = bodiesNonOverlap(x, y, w, h, bodies);
+        const cx = x + w/2, cy = y + h/2;
+        const dx = cx - shape0.cx, dy = cy - shape0.cy;
+        const clearOfShape = Math.sqrt(dx*dx + dy*dy) >= shape0.r + wordR + SHAPE_MARGIN;
+        ok = clearOfShape && bodiesNonOverlap(x, y, w, h, bodies);
         tries++;
       } while(!ok && tries < 40);
       const angle = Math.random() * Math.PI * 2;
@@ -752,6 +796,27 @@ function startPersistentFloat(adjectives){
         if(b.x + b.w > zw2 - PERSIST_MARGIN){ b.x = zw2 - PERSIST_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
         if(b.y < PERSIST_MARGIN){ b.y = PERSIST_MARGIN; b.vy = Math.abs(b.vy); }
         if(b.y + b.h > zh2 - PERSIST_MARGIN){ b.y = zh2 - PERSIST_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
+      });
+
+      // bounce off the shape itself -- recomputed live so it tracks
+      // size/motion edits without restarting the float
+      const shape = shapeCirclePx(zw2, zh2);
+      bodies.forEach(b=>{
+        const wx = b.x + b.w/2, wy = b.y + b.h/2;
+        const wordR = Math.max(b.w, b.h) / 2;
+        const dx = wx - shape.cx, dy = wy - shape.cy;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 0.0001;
+        const minDist = shape.r + wordR + SHAPE_MARGIN;
+        if(dist < minDist){
+          const nx = dx/dist, ny = dy/dist;
+          b.x += nx * (minDist - dist);
+          b.y += ny * (minDist - dist);
+          const vDotN = b.vx*nx + b.vy*ny;
+          if(vDotN < 0){
+            b.vx -= 2*vDotN*nx;
+            b.vy -= 2*vDotN*ny;
+          }
+        }
       });
 
       for(let i=0;i<bodies.length;i++){
@@ -885,28 +950,27 @@ function renderBoard(){
   `;
 }
 
-function renderPanel(){
-  const rows = state.rowOrder.map(catKey=>{
-    const cat = CATEGORIES.find(c=>c.key===catKey);
+function renderCorners(){
+  CATEGORIES.forEach(cat=>{
+    const catKey = cat.key;
     const order = state.optionOrder[catKey];
     const opts = order.map(optId=>{
       const opt = cat.options.find(o=>o.id===optId);
       const selected = state.build[catKey] === optId;
       return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${opt.icon}</button>`;
     }).join('');
-    return `
-      <div class="row">
-        <div class="row-label">${cat.label}</div>
-        <div class="options">${opts}</div>
-      </div>
+    const corner = state.cornerOf[catKey];
+    const el = document.getElementById('corner-' + corner);
+    el.innerHTML = `
+      <div class="corner-label">${cat.label}</div>
+      <div class="corner-options">${opts}</div>
     `;
-  }).join('');
-  document.getElementById('panel').innerHTML = rows;
+  });
 }
 
 function render(){
   renderBoard();
-  renderPanel();
+  renderCorners();
 }
 
 function updateStats(){
