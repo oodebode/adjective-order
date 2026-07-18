@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -267,9 +267,9 @@ function colorHex(id){
 function lineWidthUnits(id){
   // in "board units", i.e. relative to a 100-unit domain half-size;
   // scaled per-domain (board vs icon) at the call site.
-  if(id === 'thick') return 7;
-  if(id === 'thin')  return 2.2;
-  return 2.2;
+  if(id === 'thick') return 8.5;
+  if(id === 'thin')  return 1.2;
+  return 3.5; // default, before a line-width option is chosen
 }
 
 /* ---------------------------------------------------------------
