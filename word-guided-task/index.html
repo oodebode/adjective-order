@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -15,144 +15,41 @@
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
     background:#ffffff;
     color:#222;
-    padding:24px 24px 40px;
+    padding:14px 16px 18px;
   }
-  .wrap{max-width:1150px;width:100%;margin:0 auto;position:relative;}
+  .wrap{max-width:940px;width:100%;margin:0 auto;position:relative;}
 
   .top{
     display:flex;
     justify-content:space-between;
     align-items:flex-end;
-    margin-bottom:16px;
+    margin-bottom:8px;
     flex-wrap:wrap;
-    gap:12px;
+    gap:10px;
   }
-  .instruction{
-    font-size:20px;
-    line-height:1.5;
+  .prompt-label{
+    font-size:17px;
+    line-height:1.4;
     color:#222;
-    max-width:620px;
-    opacity:0;
-    transition:opacity .25s ease;
   }
-  .instruction b{font-weight:600;color:#111;}
   .stats{
-    font-size:13px;
+    font-size:12px;
     color:var(--gray-label);
     text-align:right;
     white-space:nowrap;
   }
 
-  /* full-screen scene shown at the start of each trial: a static
-     heading ("Build a star that is:") plus the adjective words
-     scattered around the screen, each drifting on its own trajectory */
-  .word-float-container{
-    position:fixed;
-    inset:0;
-    z-index:50;
-    pointer-events:none;
-    opacity:0;
-    transition:opacity .4s ease;
-  }
-  .wf-heading{
-    position:absolute;
-    top:9%;
-    left:50%;
-    transform:translateX(-50%);
-    font-size:28px;
-    line-height:1.4;
-    text-align:center;
-    color:#222;
-    white-space:nowrap;
-  }
-  .wf-heading b{font-weight:600;color:#111;}
-  .wf-word{
-    position:absolute;
-    top:0;
-    left:0;
-    font-size:24px;
-    font-weight:600;
-    color:#111;
-    white-space:nowrap;
-  }
-
-  /* persistent zone overlaying the display box: the same characteristic
-     words keep drifting here, around the shape, once the dashboard is up */
-  .board-wrap{
-    position:relative;
-    width:100%;
-    max-width:420px;
-  }
-  .characteristics-float{
-    position:absolute;
-    inset:0;
-    overflow:hidden;
-    pointer-events:none;
-  }
-  .cf-word{
-    position:absolute;
-    top:0;
-    left:0;
-    font-size:14px;
-    font-weight:600;
-    letter-spacing:.01em;
-    color:#555;
-    background:#f4f4f4;
-    border-radius:14px;
-    padding:5px 12px;
-    white-space:nowrap;
-  }
-
-  .stage{
-    transition:opacity .4s ease, transform .4s ease;
-  }
-  .stage.hidden-stage{
-    opacity:0;
-    transform:translateY(10px);
-    pointer-events:none;
-  }
-
-  .stage-grid{
-    display:grid;
-    grid-template-columns: max-content 1fr max-content;
-    grid-template-rows: auto 1fr auto;
-    grid-template-areas:
-      "tl . tr"
-      ". center ."
-      "bl . br";
-    column-gap:32px;
-    row-gap:28px;
-    align-items:start;
-  }
-  .corner-tl{grid-area:tl;}
-  .corner-tr{grid-area:tr;}
-  .corner-bl{grid-area:bl; align-self:end;}
-  .corner-br{grid-area:br; align-self:end;}
-  .corner-tr, .corner-br{text-align:right;}
-  .corner-label{
-    color:var(--gray-label);
-    font-size:14px;
-    margin-bottom:10px;
-  }
-  .corner-options{
-    display:flex;
-    gap:10px;
-    flex-wrap:nowrap;
-  }
-  .corner-tr .corner-options, .corner-br .corner-options{
-    justify-content:flex-end;
-  }
-
-  .center-area{
-    grid-area:center;
+  .box-unit{
     display:flex;
     flex-direction:column;
     align-items:center;
+    gap:5px;
   }
-  .board{
-    width:100%;
-    max-width:420px;
-    aspect-ratio:1 / 1;
+  .box-caption{
+    font-size:12px;
+    color:var(--gray-label);
+  }
+  .box{
     background:var(--board-bg);
     border:1px solid var(--gray-line);
     border-radius:4px;
@@ -161,11 +58,95 @@
     justify-content:center;
     overflow:visible;
   }
-  .board svg{overflow:visible;}
+  .box svg{overflow:visible;}
+  /* fixed across every trial -- only the shape drawn inside changes */
+  #shapeBox{ width:140px; height:140px; }
+
+  /* the square where the target's descriptive words float continuously
+     -- always visible, no transition or separate "question" step.
+     Sized/positioned to match the box it replaced. */
+  .word-square{
+    position:relative;
+    width:140px;
+    height:140px;
+    background:var(--board-bg);
+    border:1px solid var(--gray-line);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .word-float{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
+  }
+  .wf-word{
+    position:absolute;
+    top:0;
+    left:0;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.01em;
+    color:#555;
+    background:#f4f4f4;
+    border-radius:12px;
+    padding:4px 10px;
+    white-space:nowrap;
+  }
+
+  /* core: target, build, and the word-float square stacked together,
+     held fixed at the pentagon's center so their position/size never
+     move between trials -- only what's drawn inside them changes */
+  .core-stack{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+
+  /* pentagon: five fixed vertex positions wrap around the whole
+     target + build + word-float core. WHICH property lands in which
+     vertex is reshuffled every trial in JS -- these five positions
+     themselves never move. */
+  .pentagon-wrap{
+    position:relative;
+    width:min(94vw, 780px);
+    aspect-ratio:160/150;
+    margin:0 auto;
+  }
+  .pent-slot{
+    position:absolute;
+    transform:translate(-50%,-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    width:160px;
+  }
+  .pent-0{ top:4%;    left:50%;   }
+  .pent-1{ top:32%;   left:89%;   }
+  .pent-2{ top:88%;   left:75%;   }
+  .pent-3{ top:88%;   left:25%;   }
+  .pent-4{ top:32%;   left:11%;   }
+
+  .prop-label{
+    font-size:12px;
+    color:var(--gray-label);
+    text-align:center;
+  }
+  .prop-options{
+    display:flex;
+    gap:8px;
+  }
+
   .board-actions{
     display:flex;
+    justify-content:center;
     gap:10px;
-    margin-top:16px;
+    margin-top:14px;
   }
   button.action{
     font-family:inherit;
@@ -174,18 +155,17 @@
     letter-spacing:.02em;
     border:none;
     border-radius:5px;
-    padding:9px 20px;
+    padding:8px 18px;
     cursor:pointer;
-    transition:opacity .15s ease;
   }
   button.action:hover{opacity:.85;}
   button.submit{background:#111;color:#fff;}
 
   .opt{
-    background:none;
-    border:2px solid transparent;
-    border-radius:7px;
-    padding:3px;
+    background:#fff;
+    border:2px solid var(--gray-line);
+    border-radius:8px;
+    padding:5px;
     cursor:pointer;
     display:flex;
     align-items:center;
@@ -194,41 +174,32 @@
     flex:0 0 auto;
     transition:border-color .15s ease, transform .1s ease;
   }
-  .opt svg{width:22px;height:22px;}
+  .opt svg{width:56px;height:56px;display:block;}
   .opt:hover{transform:translateY(-1px);}
   .opt.selected{border-color:#111;}
-  .swatch{
-    width:20px;height:20px;border-radius:50%;
-  }
 
-  @media (max-width:640px){
-    .stage-grid{
+  @media (max-width:780px){
+    .pentagon-wrap{
+      width:100%;
+      aspect-ratio:auto;
       display:flex;
       flex-direction:column;
-      gap:24px;
+      align-items:center;
+      gap:18px;
+      position:static;
     }
-    .corner-tl, .corner-tr, .corner-bl, .corner-br{
-      text-align:left;
-    }
-    .corner-tr .corner-options, .corner-br .corner-options{
-      justify-content:flex-start;
-    }
-    .wf-heading{font-size:20px;}
-    .wf-word{font-size:18px;}
+    .core-stack{ position:static; transform:none; order:-1; }
+    .pent-slot{ position:static; transform:none; width:auto; order:initial; }
   }
 
-  /* motion animations, applied to the inner <g> that wraps the shape */
-  .m-drift{ animation: driftAnim 2.2s ease-in-out infinite; transform-origin:100px 100px; }
-  .m-spin{ animation: spinAnim 3s linear infinite; transform-origin:100px 100px; }
-  .m-shake{ animation: shakeAnim 0.5s ease-in-out infinite; transform-origin:100px 100px; }
-  .m-pulse{ animation: pulseAnim 1.4s ease-in-out infinite; transform-origin:100px 100px; }
+  /* motion animations, applied to the <g> wrapping the shape. Duration
+     is fixed regardless of shape size or which box it's drawn in, so
+     small-rotating and large-rotating always turn at the same rate,
+     and the build always rotates/shakes in lockstep with the target. */
+  .m-rotate{ animation: rotateAnim 3s linear infinite; }
+  .m-shake{  animation: shakeAnim 0.5s ease-in-out infinite; }
 
-  @keyframes driftAnim{
-    0%{transform:translateX(-38px);}
-    50%{transform:translateX(38px);}
-    100%{transform:translateX(-38px);}
-  }
-  @keyframes spinAnim{
+  @keyframes rotateAnim{
     from{transform:rotate(0deg);}
     to{transform:rotate(360deg);}
   }
@@ -236,211 +207,103 @@
     0%,100%{transform:rotate(-9deg);}
     50%{transform:rotate(9deg);}
   }
-  @keyframes pulseAnim{
-    0%,100%{transform:scale(1);}
-    50%{transform:scale(1.18);}
-  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="word-float-container" id="wordFloat">
-    <div class="wf-heading" id="wfHeading"></div>
-  </div>
-
   <div class="top">
-    <div class="instruction" id="instructionText"></div>
+    <div class="prompt-label">Match this shape:</div>
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="stage-grid stage hidden-stage" id="stage">
-    <div class="corner corner-tl" id="corner-tl"></div>
-    <div class="corner corner-tr" id="corner-tr"></div>
+  <div class="pentagon-wrap" id="pentagonWrap">
+    <div class="pent-slot pent-0" id="prop-slot-0"></div>
+    <div class="pent-slot pent-1" id="prop-slot-1"></div>
+    <div class="pent-slot pent-2" id="prop-slot-2"></div>
+    <div class="pent-slot pent-3" id="prop-slot-3"></div>
+    <div class="pent-slot pent-4" id="prop-slot-4"></div>
 
-    <div class="center-area">
-      <div class="board-wrap">
-        <div class="board" id="board"></div>
-        <div class="characteristics-float" id="charFloat"></div>
+    <div class="core-stack">
+      <div class="box-unit">
+        <div class="box" id="shapeBox"></div>
+        <div class="box-caption">Yours</div>
       </div>
-      <div class="board-actions">
-        <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
+      <div class="word-square" id="wordSquare">
+        <div class="word-float" id="wordFloat"></div>
       </div>
     </div>
+  </div>
 
-    <div class="corner corner-bl" id="corner-bl"></div>
-    <div class="corner corner-br" id="corner-br"></div>
+  <div class="board-actions">
+    <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
   </div>
 </div>
 
 <script>
 /* ---------------------------------------------------------------
-   Config: shapes and the four adjective categories
+   Config: shapes and the five binary property dimensions. This list
+   never changes trial to trial; only slot/option ORDER is shuffled.
+   Each option also carries a "word" -- the adjective shown floating
+   in the word-square below the build box, describing the TARGET's
+   actual value for that property.
 ---------------------------------------------------------------- */
-const SHAPES = ['circle','square','triangle','diamond','star'];
-
-const COLOR_OPTIONS = [
-  {id:'blue',   hex:'#2196F3'},
-  {id:'green',  hex:'#4CAF50'},
-  {id:'red',    hex:'#E53935'},
-  {id:'orange', hex:'#FFA726'},
-  {id:'pink',   hex:'#EC407A'},
-  {id:'purple', hex:'#8E44AD'}
-];
+const SHAPES = ['oval','square','triangle','diamond','star'];
 
 const CATEGORIES = [
-  { key:'size',    label:'Size',    adjective:{small:'small', large:'large'},
-    options:[
-      {id:'small', label:'Small', icon:sizeIcon('small')},
-      {id:'large', label:'Large', icon:sizeIcon('large')}
-    ]},
-  { key:'color',   label:'Color',   adjective:Object.fromEntries(COLOR_OPTIONS.map(c=>[c.id,c.id])),
-    options: COLOR_OPTIONS.map(c=>({
-      id:c.id,
-      label:c.id.charAt(0).toUpperCase()+c.id.slice(1),
-      icon:`<span class="swatch" style="background:${c.hex}"></span>`,
-      hex:c.hex
-    }))
-  },
-  { key:'texture', label:'Texture', adjective:{striped:'striped', dotted:'dotted', zigzag:'zigzag', checkered:'checkered', plain:'plain'},
-    options:[
-      {id:'striped',   label:'Striped',   icon:textureIcon('striped')},
-      {id:'dotted',    label:'Dotted',    icon:textureIcon('dotted')},
-      {id:'zigzag',    label:'Zigzag',    icon:textureIcon('zigzag')},
-      {id:'checkered', label:'Checkered', icon:textureIcon('checkered')},
-      {id:'plain',     label:'Plain',     icon:textureIcon('plain')}
-    ]},
-  { key:'motion',  label:'Motion',  adjective:{drift:'drifting', spin:'spinning', shake:'shaking', pulse:'pulsing', still:'still'},
-    options:[
-      {id:'drift', label:'Drift', icon:motionIcon('drift')},
-      {id:'spin',  label:'Spin',  icon:motionIcon('spin')},
-      {id:'shake', label:'Shake', icon:motionIcon('shake')},
-      {id:'pulse', label:'Pulse', icon:motionIcon('pulse')},
-      {id:'still', label:'Still', icon:motionIcon('still')}
-    ]}
+  { key:'size',      label:'Size',       options:[ {id:'small', label:'Small', word:'small'}, {id:'large', label:'Large', word:'large'} ] },
+  { key:'texture',   label:'Texture',    options:[ {id:'striped', label:'Striped', word:'striped'}, {id:'dotted', label:'Dotted', word:'dotted'} ] },
+  { key:'color',     label:'Color',      options:[ {id:'blue', label:'Blue', word:'blue'}, {id:'yellow', label:'Yellow', word:'yellow'} ] },
+  { key:'lineWidth', label:'Line Width', options:[ {id:'thick', label:'Thick', word:'thick'}, {id:'thin', label:'Thin', word:'thin'} ] },
+  { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking', word:'shaking'}, {id:'rotate', label:'Rotating', word:'rotating'} ] }
 ];
 
-const DEFAULT_FILL = '#171717';
+function colorHex(id){
+  if(id === 'blue')   return '#2196F3';
+  if(id === 'yellow') return '#F5C518';
+  if(id === 'black')  return '#111111';
+  return '#9a9a9a'; // neutral / not-yet-chosen (live build only, never an icon)
+}
+
+function lineWidthUnits(id){
+  // in "board units", i.e. relative to a 100-unit domain half-size;
+  // scaled per-domain (board vs icon) at the call site.
+  if(id === 'thick') return 7;
+  if(id === 'thin')  return 2.2;
+  return 2.2;
+}
 
 /* ---------------------------------------------------------------
-   Icons (built to match the reference sketch: thin black arrows,
-   line-based texture glyphs)
+   Texture fills: patterns only, never a flat solid fill, so the
+   shape always reads as an outline rather than a solid block.
+   Dotted is a classic polka-dot pattern: an evenly spaced square
+   grid of clearly separated circles, matching the reference swatch
+   (large, evenly spaced dots with visible background between them).
 ---------------------------------------------------------------- */
-function sizeIcon(kind){
-  // four thin diagonal arrows: converging toward the center for 'small',
-  // fanning out from the center for 'large'
-  const mid = 'arrow-size-' + kind;
-  const segs = kind === 'small'
-    ? [[3,3,11,11],[25,3,17,11],[3,25,11,17],[25,25,17,17]]
-    : [[11,11,3,3],[17,11,25,3],[11,17,3,25],[17,17,25,25]];
-  const lines = segs.map(([x1,y1,x2,y2])=>
-    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="1.3" marker-end="url(#${mid})"/>`
-  ).join('');
-  return `<svg width="28" height="28" viewBox="0 0 28 28">
-    <defs><marker id="${mid}" markerWidth="6" markerHeight="6" refX="4.2" refY="2.5" orient="auto"><polygon points="0,0 5,2.5 0,5" fill="#111"/></marker></defs>
-    ${lines}
-  </svg>`;
-}
-
-function textureIcon(kind){
-  if(kind==='striped'){
-    let lines='';
-    for(let i=0;i<4;i++){ const x=5+i*6; lines+=`<line x1="${x}" y1="4" x2="${x}" y2="24" stroke="#111" stroke-width="3"/>`; }
-    return `<svg width="28" height="28" viewBox="0 0 28 28">${lines}</svg>`;
+function textureFill(texture, colorId, context){
+  if(!texture) return { fill:'none', def:'' };
+  const color = colorHex(colorId);
+  const id = `pat_${context}_${texture}_${colorId||'neutral'}`;
+  let def = '';
+  if(texture === 'striped'){
+    def = `<pattern id="${id}" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="12" fill="white"/>
+      <rect x="0" width="6" height="12" fill="${color}"/>
+    </pattern>`;
+  } else if(texture === 'dotted'){
+    const w = 20, h = 20, r = 7.6;
+    def = `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">
+      <rect width="${w}" height="${h}" fill="white"/>
+      <circle cx="${w/2}" cy="${h/2}" r="${r}" fill="${color}"/>
+    </pattern>`;
   }
-  if(kind==='dotted'){
-    const pts=[[7,9],[15,9],[23,9],[11,19],[19,19]];
-    const dots = pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3" fill="#111"/>`).join('');
-    return `<svg width="28" height="28" viewBox="0 0 28 28">${dots}</svg>`;
-  }
-  if(kind==='zigzag'){
-    return `<svg width="28" height="28" viewBox="0 0 28 28">
-      <polyline points="2,12 8,6 14,12 20,6 26,12" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <polyline points="2,22 8,16 14,22 20,16 26,22" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-    </svg>`;
-  }
-  if(kind==='checkered'){
-    let squares='';
-    for(let r=0;r<3;r++){
-      for(let c=0;c<3;c++){
-        if((r+c)%2===0){
-          squares += `<rect x="${3+c*7.3}" y="${3+r*7.3}" width="7.3" height="7.3" fill="#111"/>`;
-        }
-      }
-    }
-    return `<svg width="28" height="28" viewBox="0 0 28 28">${squares}</svg>`;
-  }
-  // plain: a flat solid swatch, no pattern
-  return `<svg width="28" height="28" viewBox="0 0 28 28">
-    <rect x="5" y="5" width="18" height="18" rx="3" fill="#111"/>
-  </svg>`;
-}
-
-function motionIcon(kind){
-  if(kind==='drift'){
-    return `<svg width="28" height="28" viewBox="0 0 28 28">
-      <defs><marker id="arrow-drift" markerWidth="6" markerHeight="6" refX="4.2" refY="2.5" orient="auto"><polygon points="0,0 5,2.5 0,5" fill="#111"/></marker></defs>
-      <line x1="4" y1="14" x2="19" y2="14" stroke="#111" stroke-width="1.6" marker-end="url(#arrow-drift)"/>
-      <line x1="4" y1="9"  x2="10" y2="9"  stroke="#111" stroke-width="1.3" opacity=".5"/>
-      <line x1="4" y1="19" x2="10" y2="19" stroke="#111" stroke-width="1.3" opacity=".5"/>
-    </svg>`;
-  }
-  if(kind==='spin'){
-    // arc swept clockwise from -90deg to 180deg around (14,14) r=8;
-    // arrowhead is a hand-built isoceles triangle centered exactly on
-    // the arc's endpoint, tip pointing along the tangent direction.
-    const cx=14, cy=14, r=8;
-    const start = {x:cx, y:cy-r};   // -90deg
-    const end   = {x:cx-r, y:cy};   // 180deg, tangent (clockwise) = (0,-1)
-    const tipLen=5, halfW=2.2;
-    const tip = [end.x, end.y - tipLen];
-    const b1  = [end.x + halfW, end.y];
-    const b2  = [end.x - halfW, end.y];
-    return `<svg width="28" height="28" viewBox="0 0 28 28">
-      <path d="M${start.x},${start.y} A${r},${r} 0 1 1 ${end.x},${end.y}" fill="none" stroke="#111" stroke-width="1.6"/>
-      <polygon points="${tip.join(',')} ${b1.join(',')} ${b2.join(',')}" fill="#111"/>
-    </svg>`;
-  }
-  if(kind==='shake'){
-    // two small curved arrows, arcing oppositely above and below center,
-    // to read as a back-and-forth wobble rather than a straight double-arrow
-    const grey = '#111';
-    const arrow = (ex,ey,tx,ty)=>{
-      const len = Math.sqrt(tx*tx+ty*ty); const ux=tx/len, uy=ty/len;
-      const px=-uy, py=ux;
-      const tipLen=4.2, halfW=2.1;
-      const tip=[ex+ux*tipLen, ey+uy*tipLen];
-      const b1=[ex+px*halfW, ey+py*halfW];
-      const b2=[ex-px*halfW, ey-py*halfW];
-      return `${tip[0].toFixed(1)},${tip[1].toFixed(1)} ${b1[0].toFixed(1)},${b1[1].toFixed(1)} ${b2[0].toFixed(1)},${b2[1].toFixed(1)}`;
-    };
-    // top arc: curves up then ends pointing right; tangent at end = end - control
-    const topEnd=[20,10], topCtrl=[14,3];
-    const topTangent=[topEnd[0]-topCtrl[0], topEnd[1]-topCtrl[1]];
-    // bottom arc: curves down then ends pointing left; tangent at end = end - control
-    const botEnd=[8,18], botCtrl=[14,25];
-    const botTangent=[botEnd[0]-botCtrl[0], botEnd[1]-botCtrl[1]];
-    return `<svg width="28" height="28" viewBox="0 0 28 28">
-      <path d="M8,10 Q${topCtrl[0]},${topCtrl[1]} ${topEnd[0]},${topEnd[1]}" fill="none" stroke="${grey}" stroke-width="1.6" stroke-linecap="round"/>
-      <polygon points="${arrow(topEnd[0],topEnd[1],topTangent[0],topTangent[1])}" fill="${grey}"/>
-      <path d="M20,18 Q${botCtrl[0]},${botCtrl[1]} ${botEnd[0]},${botEnd[1]}" fill="none" stroke="${grey}" stroke-width="1.6" stroke-linecap="round"/>
-      <polygon points="${arrow(botEnd[0],botEnd[1],botTangent[0],botTangent[1])}" fill="${grey}"/>
-    </svg>`;
-  }
-  if(kind==='still'){
-    return `<svg width="28" height="28" viewBox="0 0 28 28">
-      <rect x="11" y="11" width="6" height="6" fill="#111"/>
-    </svg>`;
-  }
-  // pulse
-  return `<svg width="28" height="28" viewBox="0 0 28 28">
-    <circle cx="14" cy="14" r="4" fill="#111"/>
-    <circle cx="14" cy="14" r="9" fill="none" stroke="#111" stroke-width="1.5" opacity=".55"/>
-    <circle cx="14" cy="14" r="13" fill="none" stroke="#111" stroke-width="1.2" opacity=".3"/>
-  </svg>`;
+  return { fill:`url(#${id})`, def };
 }
 
 /* ---------------------------------------------------------------
-   Shape geometry (200x200 viewBox)
+   Shape geometry. Every shape is drawn from a single circumradius R
+   (max distance from center) around (cx,cy), so every shape occupies
+   an equal-area rotation-safe footprint and rotating/shaking never
+   pushes any shape further from center than R.
 ---------------------------------------------------------------- */
 function starPoints(cx,cy,rOuter,rInner,n=5){
   let pts=[];
@@ -453,7 +316,6 @@ function starPoints(cx,cy,rOuter,rInner,n=5){
 }
 
 function regularPolygonPoints(cx,cy,r,n){
-  // vertices evenly spaced around a circle -> centroid is always exactly (cx,cy)
   let pts=[];
   for(let i=0;i<n;i++){
     const a = -Math.PI/2 + i*(2*Math.PI/n);
@@ -462,23 +324,92 @@ function regularPolygonPoints(cx,cy,r,n){
   return pts.join(' ');
 }
 
-function shapeMarkup(shape, fill, R, strokeAttr){
-  strokeAttr = strokeAttr || '';
+function shapeElement(shape, cx, cy, R, styleAttrs){
   switch(shape){
-    case 'circle':   return `<circle cx="100" cy="100" r="${R.toFixed(2)}" fill="${fill}"${strokeAttr}/>`;
-    case 'square': {
-      // A square's corner (not its edge) is what's R away from center, so its
-      // half-width is R/sqrt(2) -- this keeps the square's own rotation-safe
-      // enclosing square (its diagonal-swept circle) equal to every other
-      // shape's, rather than under- or over-sizing it relative to them.
-      const hw = R / Math.SQRT2;
-      const rx = Math.max(2, hw * 0.11);
-      return `<rect x="${(100-hw).toFixed(2)}" y="${(100-hw).toFixed(2)}" width="${(hw*2).toFixed(2)}" height="${(hw*2).toFixed(2)}" rx="${rx.toFixed(2)}" fill="${fill}"${strokeAttr}/>`;
+    case 'oval': {
+      const ry = R * 0.62;
+      return `<ellipse cx="${cx}" cy="${cy}" rx="${R.toFixed(2)}" ry="${ry.toFixed(2)}" ${styleAttrs}/>`;
     }
-    case 'triangle': return `<polygon points="${regularPolygonPoints(100,100,R,3)}" fill="${fill}"${strokeAttr}/>`;
-    case 'diamond':  return `<polygon points="100,${(100-R).toFixed(2)} ${(100+R).toFixed(2)},100 100,${(100+R).toFixed(2)} ${(100-R).toFixed(2)},100" fill="${fill}"${strokeAttr}/>`;
-    case 'star':     return `<polygon points="${starPoints(100,100,R,R*0.4)}" fill="${fill}"${strokeAttr}/>`;
+    case 'square': {
+      const hw = R / Math.SQRT2;
+      const rx = Math.max(1, hw*0.11);
+      return `<rect x="${(cx-hw).toFixed(2)}" y="${(cy-hw).toFixed(2)}" width="${(hw*2).toFixed(2)}" height="${(hw*2).toFixed(2)}" rx="${rx.toFixed(2)}" ${styleAttrs}/>`;
+    }
+    case 'triangle': return `<polygon points="${regularPolygonPoints(cx,cy,R,3)}" ${styleAttrs}/>`;
+    case 'diamond':  return `<polygon points="${cx},${(cy-R).toFixed(2)} ${(cx+R).toFixed(2)},${cy} ${cx},${(cy+R).toFixed(2)} ${(cx-R).toFixed(2)},${cy}" ${styleAttrs}/>`;
+    case 'star':     return `<polygon points="${starPoints(cx,cy,R,R*0.4)}" ${styleAttrs}/>`;
   }
+}
+
+/* ---------------------------------------------------------------
+   Size model: both the boxes (200x200 viewBox) and the icons (120x120
+   viewBox) share the same SIZE_FRACTION -- "large" always means the
+   same proportion of its own domain, whether it's drawn in the target
+   box, the build box, or a property icon. Since rotate/shake never
+   push a shape further from its own center than R, the only bound
+   that matters is: R + the full outline ring (drawn OUTSIDE R) must
+   still fit inside the domain at the THICKEST line width, at the
+   LARGE size tier. Solving that once keeps every combination safe.
+---------------------------------------------------------------- */
+const SIZE_FRACTION = { small: 0.22, default: 0.55, large: 0.93 };
+
+// The pattern fill is drawn at exactly R with no stroke of its own; the
+// outline is a separate, stroke-only copy of the same shape drawn at
+// R + strokeWidth/2. That keeps line width purely a property of the
+// outline ring -- it never grows or shrinks the pattern, which always
+// stops exactly at R.
+function specToSvg(spec, cx, cy, context){
+  const domainHalf = cx; // cx === cy === this domain's own half-size (100 for boxes, 60 for icons)
+  const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
+  const strokeColor = colorHex(spec.color);
+  const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100);
+  const fillInfo = textureFill(spec.texture, spec.color, context);
+
+  const fillEl = shapeElement(spec.shape, cx, cy, R, `fill="${fillInfo.fill}" stroke="none"`);
+  const outlineR = R + strokeWidth / 2;
+  const outlineEl = shapeElement(spec.shape, cx, cy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
+
+  const motionClass = spec.motion ? ('m-' + spec.motion) : '';
+  return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass };
+}
+
+function renderInto(el, spec, viewBoxSize, cx, cy, context){
+  const { def, shapeSvg, motionClass } = specToSvg(spec, cx, cy, context);
+  el.innerHTML = `
+    <svg viewBox="0 0 ${viewBoxSize} ${viewBoxSize}" width="100%" height="100%">
+      <defs>${def}</defs>
+      <g class="${motionClass}" style="transform-origin:${cx}px ${cy}px;">${shapeSvg}</g>
+    </svg>
+  `;
+}
+
+/* ---------------------------------------------------------------
+   Property-option icons: each button shows the *effect* of applying
+   that specific option to the current trial's shape, against a black,
+   neutral baseline -- so the icon itself demonstrates the change
+   (a genuinely bigger/smaller shape, a genuinely thicker/thinner
+   outline) rather than symbolizing it with an abstract arrow. Every
+   icon is drawn at the shape's "large" size fraction (except the Size
+   option itself, which shows its own true small/large scale), so
+   every icon reads at a consistent, large, clear scale.
+---------------------------------------------------------------- */
+const ICON_VB = 120;
+const ICON_CENTER = 60;
+
+function previewIconSvg(catKey, optId){
+  const spec = {
+    shape: state.target.shape,
+    size:'large', texture:null,
+    color: (catKey === 'color' ? null : 'black'),
+    lineWidth:'thin', motion:null
+  };
+  spec[catKey] = optId;
+  const context = 'prev_' + catKey + '_' + optId;
+  const { def, shapeSvg, motionClass } = specToSvg(spec, ICON_CENTER, ICON_CENTER, context);
+  return `<svg viewBox="0 0 ${ICON_VB} ${ICON_VB}">
+    <defs>${def}</defs>
+    <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;">${shapeSvg}</g>
+  </svg>`;
 }
 
 /* ---------------------------------------------------------------
@@ -486,43 +417,23 @@ function shapeMarkup(shape, fill, R, strokeAttr){
 ---------------------------------------------------------------- */
 let state = {
   target: null,
-  build: { size:null, color:null, texture:null, motion:null },
-  rowOrder: [],
-  cornerOf: {},
-  optionOrder: {},
-  sentenceOrder: [],
-  trialCount: 0
+  build: { size:null, texture:null, color:null, lineWidth:null, motion:null },
+  trialCount: 0,
+  slotOrder: [],   // slotOrder[i] = category key placed in pentagon position i, re-shuffled every trial
+  optionOrder: {}  // optionOrder[catKey] = shuffled option-id order, re-shuffled every trial
 };
 
-const CORNER_IDS = ['tl','tr','bl','br'];
+let floatAnimHandle = null;
 
-const MOVE_MS = 850;      // duration of the glide-up animation
-const READING_WPM = 220;  // average adult silent-reading speed
-const MIN_READ_MS = 1400; // floor so even a short sentence doesn't flash by
-
-function readingTimeMs(text){
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(MIN_READ_MS, Math.round(words / READING_WPM * 60 * 1000));
-}
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 function shuffle(arr){
   const a = arr.slice();
   for(let i=a.length-1;i>0;i--){
     const j = Math.floor(Math.random()*(i+1));
-    [a[i],a[j]]=[a[j],a[i]];
+    [a[i],a[j]] = [a[j],a[i]];
   }
   return a;
-}
-
-function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-
-function buildSentenceHTML(target){
-  const adjectives = state.sentenceOrder.map(catKey=>{
-    const cat = CATEGORIES.find(c=>c.key===catKey);
-    return cat.adjective[target[catKey]];
-  });
-  const article = /^[aeiou]/i.test(adjectives[0]) ? 'an' : 'a';
-  return `Build ${article} <b>${adjectives.join('</b>, <b>')}</b> <b>${target.shape}</b>.`;
 }
 
 function newTrial(){
@@ -533,24 +444,18 @@ function newTrial(){
   });
 
   state.target = target;
-  state.build = { size:null, color:null, texture:null, motion:null };
+  state.build = { size:null, texture:null, color:null, lineWidth:null, motion:null };
+  state.trialCount += 1;
 
-  // which corner each characteristic (size/color/texture/motion) appears in,
-  // re-randomized every trial
-  state.rowOrder = shuffle(CATEGORIES.map(c=>c.key));
-  state.cornerOf = {};
-  state.rowOrder.forEach((catKey, i)=>{ state.cornerOf[catKey] = CORNER_IDS[i]; });
-
-  // order of the OPTIONS within each characteristic -- independent of which
-  // corner the characteristic landed in, re-randomized every trial
+  // which pentagon vertex each property lands in, re-randomized every trial
+  state.slotOrder = shuffle(CATEGORIES.map(c=>c.key));
+  // order of the two options within each property, re-randomized every trial
   state.optionOrder = {};
   CATEGORIES.forEach(cat=>{
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
   });
-  state.sentenceOrder = shuffle(CATEGORIES.map(c=>c.key));
-  state.trialCount += 1;
 
-  runTrialIntro();
+  render();
 }
 
 function submitTrial(){
@@ -563,21 +468,50 @@ function selectOption(catKey, optId){
 }
 
 /* ---------------------------------------------------------------
-   Trial intro: a static heading ("Build a star that is:") appears,
-   and the adjective words for this trial scatter to random spots
-   around the screen, each drifting on its own independent velocity
-   and bouncing off the screen edges so it's never lost off-screen.
-   After a beat, everything fades and the board/panel reveal.
+   Rendering. The pentagon's five vertex positions and the box
+   sizes/positions are fixed in the markup/CSS and never move between
+   trials -- no transition screen, no separate "question" step; the
+   target, an empty build, and the floating words for this trial's
+   target simply appear together the instant a trial starts. Only the
+   target spec, the build state, and which property/option sits where
+   are refreshed each round.
 ---------------------------------------------------------------- */
-const FLOAT_MIN_MS = 2200;             // floor float time even with few words
-const FLOAT_MS_PER_WORD = 550;         // extra float time per adjective word
-const WORD_SPEED_MIN = 35;             // px/s
-const WORD_SPEED_MAX = 70;             // px/s
-const WORD_MARGIN = 16;                // keep words this far from screen edges
-const HEADING_ZONE_FRAC = 0.22;        // top fraction of screen reserved for heading
+function render(){
+  renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
+  renderProperties();
+  updateStats();
+  startWordFloat();
+}
 
-let floatAnimHandle = null;
-let persistentAnimHandle = null;
+function renderProperties(){
+  state.slotOrder.forEach((catKey, i)=>{
+    const cat = CATEGORIES.find(c=>c.key === catKey);
+    const el = document.getElementById('prop-slot-' + i);
+    const order = state.optionOrder[catKey];
+    const opts = order.map(optId=>{
+      const opt = cat.options.find(o=>o.id === optId);
+      const selected = state.build[catKey] === optId;
+      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${previewIconSvg(catKey, optId)}</button>`;
+    }).join('');
+    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+  });
+}
+
+function updateStats(){
+  document.getElementById('statsText').textContent = `Trial ${state.trialCount}`;
+}
+
+/* ---------------------------------------------------------------
+   Word float: the target's five descriptive words (its actual size,
+   texture, color, line-width, and motion values) drift continuously
+   in their own square below the build box -- independent trajectories,
+   bouncing off the square's own edges and off each other, restarted
+   fresh every trial. No intro scene, no memorization step: this square
+   is simply always visible, right alongside the visual target.
+---------------------------------------------------------------- */
+const WORD_SPEED_MIN = 16;
+const WORD_SPEED_MAX = 36;
+const WORD_MARGIN = 5;
 
 function bodiesNonOverlap(x, y, w, h, list){
   for(const b of list){
@@ -586,169 +520,20 @@ function bodiesNonOverlap(x, y, w, h, list){
   return true;
 }
 
-function runTrialIntro(){
-  const stage = document.getElementById('stage');
-  const submitBtn = document.getElementById('submitBtn');
-  const container = document.getElementById('wordFloat');
-  const heading = document.getElementById('wfHeading');
-  const topText = document.getElementById('instructionText');
-  const charFloat = document.getElementById('charFloat');
+function startWordFloat(){
+  if(floatAnimHandle){ cancelAnimationFrame(floatAnimHandle); floatAnimHandle = null; }
 
-  stage.classList.add('hidden-stage');
-  submitBtn.disabled = true;
+  const zone = document.getElementById('wordFloat');
+  zone.querySelectorAll('.wf-word').forEach(el=>el.remove());
 
-  if(floatAnimHandle) cancelAnimationFrame(floatAnimHandle);
-  if(persistentAnimHandle) cancelAnimationFrame(persistentAnimHandle);
-  container.querySelectorAll('.wf-word').forEach(el=>el.remove());
-  charFloat.querySelectorAll('.cf-word').forEach(el=>el.remove());
-
-  const target = state.target;
-  const article = /^[aeiou]/i.test(target.shape) ? 'an' : 'a';
-  // this heading names the shape only -- never the full sentence
-  const headingHtml = `Build ${article} <b>${target.shape}</b> that is:`;
-  heading.innerHTML = headingHtml;
-  topText.innerHTML = headingHtml;
-  topText.style.opacity = 0;
-
-  const adjectives = state.sentenceOrder.map(catKey=>{
-    const cat = CATEGORIES.find(c=>c.key===catKey);
-    return cat.adjective[target[catKey]];
+  const words = CATEGORIES.map(cat=>{
+    const opt = cat.options.find(o=>o.id === state.target[cat.key]);
+    return opt.word;
   });
 
-  container.style.transition = 'none';
-  container.style.opacity = 1;
-  container.offsetHeight; // force reflow
-  container.style.transition = '';
-
-  const wordEls = adjectives.map(word=>{
+  const wordEls = words.map(word=>{
     const el = document.createElement('div');
     el.className = 'wf-word';
-    el.textContent = word;
-    container.appendChild(el);
-    return el;
-  });
-
-  requestAnimationFrame(()=>{
-    const cw = window.innerWidth;
-    const ch = window.innerHeight;
-    const topBound = ch * HEADING_ZONE_FRAC;
-
-    const bodies = [];
-    wordEls.forEach(el=>{
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      let x, y, tries = 0, ok;
-      do {
-        x = WORD_MARGIN + Math.random() * Math.max(1, cw - w - WORD_MARGIN*2);
-        y = topBound + Math.random() * Math.max(1, ch - h - topBound - WORD_MARGIN);
-        ok = bodiesNonOverlap(x, y, w, h, bodies);
-        tries++;
-      } while(!ok && tries < 40);
-      const angle = Math.random() * Math.PI * 2;
-      const speed = WORD_SPEED_MIN + Math.random() * (WORD_SPEED_MAX - WORD_SPEED_MIN);
-      bodies.push({ el, x, y, w, h, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed });
-    });
-
-    bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
-
-    const floatDuration = Math.max(FLOAT_MIN_MS, MIN_READ_MS + adjectives.length*FLOAT_MS_PER_WORD);
-    const startT = performance.now();
-    let lastT = startT;
-
-    function tick(now){
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const cw2 = window.innerWidth;
-      const ch2 = window.innerHeight;
-      const topBound2 = ch2 * HEADING_ZONE_FRAC;
-
-      // move + bounce off screen edges, so words never leave the screen
-      bodies.forEach(b=>{
-        b.x += b.vx * dt;
-        b.y += b.vy * dt;
-        if(b.x < WORD_MARGIN){ b.x = WORD_MARGIN; b.vx = Math.abs(b.vx); }
-        if(b.x + b.w > cw2 - WORD_MARGIN){ b.x = cw2 - WORD_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
-        if(b.y < topBound2){ b.y = topBound2; b.vy = Math.abs(b.vy); }
-        if(b.y + b.h > ch2 - WORD_MARGIN){ b.y = ch2 - WORD_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
-      });
-
-      // gentle separation so words don't sit on top of each other and stay legible
-      for(let i=0;i<bodies.length;i++){
-        for(let j=i+1;j<bodies.length;j++){
-          const a = bodies[i], b = bodies[j];
-          const ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2;
-          const dx = bx-ax, dy = by-ay;
-          const minDx = (a.w+b.w)/2 + 8;
-          const minDy = (a.h+b.h)/2 + 8;
-          if(Math.abs(dx) < minDx && Math.abs(dy) < minDy){
-            const overlapX = minDx - Math.abs(dx);
-            const overlapY = minDy - Math.abs(dy);
-            if(overlapX < overlapY){
-              const push = overlapX/2 * (dx < 0 ? -1 : 1);
-              a.x -= push; b.x += push;
-              const t = a.vx; a.vx = b.vx; b.vx = t;
-            } else {
-              const push = overlapY/2 * (dy < 0 ? -1 : 1);
-              a.y -= push; b.y += push;
-              const t = a.vy; a.vy = b.vy; b.vy = t;
-            }
-          }
-        }
-      }
-
-      bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
-
-      if(now - startT < floatDuration){
-        floatAnimHandle = requestAnimationFrame(tick);
-      } else {
-        floatAnimHandle = null;
-        container.style.opacity = 0;
-        setTimeout(()=>{
-          container.querySelectorAll('.wf-word').forEach(el=>el.remove());
-          topText.style.opacity = 1;
-          renderBoard();
-          renderCorners();
-          stage.classList.remove('hidden-stage');
-          submitBtn.disabled = false;
-          updateStats();
-          startPersistentFloat(adjectives);
-        }, 400);
-      }
-    }
-    floatAnimHandle = requestAnimationFrame(tick);
-  });
-}
-
-/* ---------------------------------------------------------------
-   Persistent float: once the dashboard is up, the same characteristic
-   words keep drifting -- confined to the display box around the shape,
-   on independent trajectories, for as long as the trial lasts.
----------------------------------------------------------------- */
-const PERSIST_SPEED_MIN = 18; // px/s, slower & calmer than the intro
-const PERSIST_SPEED_MAX = 42;
-const PERSIST_MARGIN = 6;
-const SHAPE_MARGIN = 10; // gap words keep from the shape's edge when they bounce off it
-
-// current shape's circular footprint inside the display box, in pixels --
-// mirrors the board's own R-based sizing (BASE_RADIUS/SIZE_SCALE) plus
-// each motion's own reach (drift's sway, pulse's peak scale), so words
-// bounce off the shape's true edge, live, as size/motion selections change
-function shapeCirclePx(zw, zh){
-  const scalePx = zw / 200; // board's SVG viewBox is 200x200
-  const sizeScale = SIZE_SCALE[state.build.size] || 1;
-  let r = BASE_RADIUS * sizeScale;
-  if(state.build.motion === 'drift') r += DRIFT_PX;
-  else if(state.build.motion === 'pulse') r *= PULSE_PEAK;
-  return { cx: zw/2, cy: zh/2, r: r * scalePx };
-}
-
-function startPersistentFloat(adjectives){
-  const zone = document.getElementById('charFloat');
-  zone.querySelectorAll('.cf-word').forEach(el=>el.remove());
-
-  const wordEls = adjectives.map(word=>{
-    const el = document.createElement('div');
-    el.className = 'cf-word';
     el.textContent = word;
     zone.appendChild(el);
     return el;
@@ -756,26 +541,21 @@ function startPersistentFloat(adjectives){
 
   requestAnimationFrame(()=>{
     const rect = zone.getBoundingClientRect();
-    const zw = rect.width, zh = rect.height;
-    const shape0 = shapeCirclePx(zw, zh);
+    const zw = rect.width || 140, zh = rect.height || 70;
 
     const bodies = [];
     wordEls.forEach(el=>{
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      const wordR = Math.max(w, h) / 2;
+      const w = el.offsetWidth || 40;
+      const h = el.offsetHeight || 20;
       let x, y, tries = 0, ok;
       do {
-        x = PERSIST_MARGIN + Math.random() * Math.max(1, zw - w - PERSIST_MARGIN*2);
-        y = PERSIST_MARGIN + Math.random() * Math.max(1, zh - h - PERSIST_MARGIN*2);
-        const cx = x + w/2, cy = y + h/2;
-        const dx = cx - shape0.cx, dy = cy - shape0.cy;
-        const clearOfShape = Math.sqrt(dx*dx + dy*dy) >= shape0.r + wordR + SHAPE_MARGIN;
-        ok = clearOfShape && bodiesNonOverlap(x, y, w, h, bodies);
+        x = WORD_MARGIN + Math.random() * Math.max(1, zw - w - WORD_MARGIN*2);
+        y = WORD_MARGIN + Math.random() * Math.max(1, zh - h - WORD_MARGIN*2);
+        ok = bodiesNonOverlap(x, y, w, h, bodies);
         tries++;
       } while(!ok && tries < 40);
       const angle = Math.random() * Math.PI * 2;
-      const speed = PERSIST_SPEED_MIN + Math.random() * (PERSIST_SPEED_MAX - PERSIST_SPEED_MIN);
+      const speed = WORD_SPEED_MIN + Math.random() * (WORD_SPEED_MAX - WORD_SPEED_MIN);
       bodies.push({ el, x, y, w, h, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed });
     });
 
@@ -787,36 +567,15 @@ function startPersistentFloat(adjectives){
       const dt = Math.min(0.05, (now - lastT) / 1000);
       lastT = now;
       const r = zone.getBoundingClientRect();
-      const zw2 = r.width, zh2 = r.height;
+      const zw2 = r.width || zw, zh2 = r.height || zh;
 
       bodies.forEach(b=>{
         b.x += b.vx * dt;
         b.y += b.vy * dt;
-        if(b.x < PERSIST_MARGIN){ b.x = PERSIST_MARGIN; b.vx = Math.abs(b.vx); }
-        if(b.x + b.w > zw2 - PERSIST_MARGIN){ b.x = zw2 - PERSIST_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
-        if(b.y < PERSIST_MARGIN){ b.y = PERSIST_MARGIN; b.vy = Math.abs(b.vy); }
-        if(b.y + b.h > zh2 - PERSIST_MARGIN){ b.y = zh2 - PERSIST_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
-      });
-
-      // bounce off the shape itself -- recomputed live so it tracks
-      // size/motion edits without restarting the float
-      const shape = shapeCirclePx(zw2, zh2);
-      bodies.forEach(b=>{
-        const wx = b.x + b.w/2, wy = b.y + b.h/2;
-        const wordR = Math.max(b.w, b.h) / 2;
-        const dx = wx - shape.cx, dy = wy - shape.cy;
-        const dist = Math.sqrt(dx*dx + dy*dy) || 0.0001;
-        const minDist = shape.r + wordR + SHAPE_MARGIN;
-        if(dist < minDist){
-          const nx = dx/dist, ny = dy/dist;
-          b.x += nx * (minDist - dist);
-          b.y += ny * (minDist - dist);
-          const vDotN = b.vx*nx + b.vy*ny;
-          if(vDotN < 0){
-            b.vx -= 2*vDotN*nx;
-            b.vy -= 2*vDotN*ny;
-          }
-        }
+        if(b.x < WORD_MARGIN){ b.x = WORD_MARGIN; b.vx = Math.abs(b.vx); }
+        if(b.x + b.w > zw2 - WORD_MARGIN){ b.x = zw2 - WORD_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
+        if(b.y < WORD_MARGIN){ b.y = WORD_MARGIN; b.vy = Math.abs(b.vy); }
+        if(b.y + b.h > zh2 - WORD_MARGIN){ b.y = zh2 - WORD_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
       });
 
       for(let i=0;i<bodies.length;i++){
@@ -824,8 +583,8 @@ function startPersistentFloat(adjectives){
           const a = bodies[i], b = bodies[j];
           const ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2;
           const dx = bx-ax, dy = by-ay;
-          const minDx = (a.w+b.w)/2 + 6;
-          const minDy = (a.h+b.h)/2 + 6;
+          const minDx = (a.w+b.w)/2 + 4;
+          const minDy = (a.h+b.h)/2 + 4;
           if(Math.abs(dx) < minDx && Math.abs(dy) < minDy){
             const overlapX = minDx - Math.abs(dx);
             const overlapY = minDy - Math.abs(dy);
@@ -843,138 +602,10 @@ function startPersistentFloat(adjectives){
       }
 
       bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
-      persistentAnimHandle = requestAnimationFrame(tick);
+      floatAnimHandle = requestAnimationFrame(tick);
     }
-    persistentAnimHandle = requestAnimationFrame(tick);
+    floatAnimHandle = requestAnimationFrame(tick);
   });
-}
-
-/* ---------------------------------------------------------------
-   Rendering
----------------------------------------------------------------- */
-function colorHex(id){
-  if(!id) return DEFAULT_FILL;
-  const c = COLOR_OPTIONS.find(c=>c.id===id);
-  return c ? c.hex : DEFAULT_FILL;
-}
-
-function buildFill(build){
-  const color = colorHex(build.color);
-  if(!build.texture || build.texture === 'plain') return color;
-
-  const safeId = 'pat_' + build.texture + '_' + color.replace('#','');
-  let patternDef = '';
-  if(build.texture === 'striped'){
-    patternDef = `<pattern id="${safeId}" width="14" height="14" patternUnits="userSpaceOnUse">
-      <rect width="14" height="14" fill="white"/>
-      <rect x="0" width="6" height="14" fill="${color}"/>
-    </pattern>`;
-  } else if(build.texture === 'dotted'){
-    patternDef = `<pattern id="${safeId}" width="20" height="20" patternUnits="userSpaceOnUse">
-      <rect width="20" height="20" fill="white"/>
-      <circle cx="5" cy="5" r="3.2" fill="${color}"/>
-      <circle cx="15" cy="15" r="3.2" fill="${color}"/>
-    </pattern>`;
-  } else if(build.texture === 'zigzag'){
-    patternDef = `<pattern id="${safeId}" width="16" height="20" patternUnits="userSpaceOnUse">
-      <rect width="16" height="20" fill="white"/>
-      <polyline points="-2,6 2,2 6,6 10,2 14,6 18,2" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <polyline points="-2,16 2,12 6,16 10,12 14,16 18,12" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </pattern>`;
-  } else if(build.texture === 'checkered'){
-    patternDef = `<pattern id="${safeId}" width="16" height="16" patternUnits="userSpaceOnUse">
-      <rect width="16" height="16" fill="white"/>
-      <rect x="0" y="0" width="8" height="8" fill="${color}"/>
-      <rect x="8" y="8" width="8" height="8" fill="${color}"/>
-    </pattern>`;
-  }
-  return { fill:`url(#${safeId})`, def:patternDef };
-}
-
-// -----------------------------------------------------------------
-// Size model: every shape is drawn from a single circumradius R (its
-// max distance from center, in the 200x200 viewBox). Using the SAME R
-// for every shape means every shape's rotation-safe enclosing square
-// (side 2R) has identical area -- shapes are visually equal-weighted.
-//
-// Size (small/default/large) is just a fixed multiplier on R. Motion is
-// applied in a SEPARATE, outer SVG group in fixed board coordinates (see
-// renderBoard), so a motion's own reach (drift's fixed px sway, pulse's
-// peak scale) never gets multiplied by the size scale. That's what makes
-// it possible to solve for R once, rather than per-motion: we only need
-// BASE_RADIUS small/safe enough that the LARGEST size tier still fits
-// under the SINGLE worst-case motion, and every other (size, motion)
-// combination is then automatically safe too.
-// -----------------------------------------------------------------
-const SIZE_SCALE = { small: 0.62, large: 1.35 }; // "default" (no size chosen) = 1
-const DRIFT_PX = 38;      // driftAnim translateX amplitude, fixed board px
-const PULSE_PEAK = 1.18;  // pulseAnim peak scale multiplier
-const VIEWBOX_HALF = 100;
-const EDGE_PADDING = 4;   // keep a small margin so shapes don't touch the very edge
-const MAX_REACH = VIEWBOX_HALF - EDGE_PADDING;
-
-const BASE_RADIUS = (() => {
-  const largeMult = SIZE_SCALE.large;
-  const SAFETY = 1; // small buffer so the tightest case isn't exactly on the edge
-  const safeReach = MAX_REACH - SAFETY;
-  // Each candidate is "how big can R be so that, at the largest size tier,
-  // this specific motion still keeps the shape within safeReach?"
-  const rFromStillOrRotate = safeReach / largeMult;                 // still/spin/shake: largeMult*R <= safeReach
-  const rFromPulse         = safeReach / (largeMult * PULSE_PEAK);  // pulse: largeMult*R*1.18 <= safeReach
-  const rFromDrift         = (safeReach - DRIFT_PX) / largeMult;    // drift: largeMult*R + 38 <= safeReach
-  return Math.min(rFromStillOrRotate, rFromPulse, rFromDrift);
-})();
-
-function renderBoard(){
-  const build = state.build;
-  const scale = SIZE_SCALE[build.size] || 1; // small/large multiplier, or 1 for default — never depends on motion
-  const R = BASE_RADIUS * scale;
-
-  const motionClass = (build.motion && build.motion !== 'still') ? 'm-'+build.motion : '';
-
-  const fillInfo = buildFill(build);
-  const fill = typeof fillInfo === 'string' ? fillInfo : fillInfo.fill;
-  const patternDef = typeof fillInfo === 'string' ? '' : fillInfo.def;
-
-  const hasPattern = build.texture && build.texture !== 'plain';
-  const strokeAttr = hasPattern ? ` stroke="#000" stroke-width="0.5" stroke-opacity="0.2"` : '';
-  const shapeSvg = shapeMarkup(state.target.shape, fill, R, strokeAttr);
-
-  document.getElementById('board').innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 200 200">
-      <defs>${patternDef}</defs>
-      <g class="${motionClass}">
-        ${shapeSvg}
-      </g>
-    </svg>
-  `;
-}
-
-function renderCorners(){
-  CATEGORIES.forEach(cat=>{
-    const catKey = cat.key;
-    const order = state.optionOrder[catKey];
-    const opts = order.map(optId=>{
-      const opt = cat.options.find(o=>o.id===optId);
-      const selected = state.build[catKey] === optId;
-      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${opt.icon}</button>`;
-    }).join('');
-    const corner = state.cornerOf[catKey];
-    const el = document.getElementById('corner-' + corner);
-    el.innerHTML = `
-      <div class="corner-label">${cat.label}</div>
-      <div class="corner-options">${opts}</div>
-    `;
-  });
-}
-
-function render(){
-  renderBoard();
-  renderCorners();
-}
-
-function updateStats(){
-  document.getElementById('statsText').textContent = `Trial ${state.trialCount}`;
 }
 
 newTrial();
