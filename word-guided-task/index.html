@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -207,10 +207,72 @@
     0%,100%{transform:rotate(-9deg);}
     50%{transform:rotate(9deg);}
   }
+
+  /* ---- pre-task screens: sandbox + instructions ---- */
+  .screen-inner{
+    max-width:520px;
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    text-align:center;
+  }
+  #instructionsWrap{
+    min-height:80vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .screen-title{ font-size:20px; margin:0; }
+  .screen-text{ font-size:15px; line-height:1.65; color:#333; margin:0; }
+  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; }
+  button.action:disabled{ opacity:.4; cursor:not-allowed; }
+  .proceed-slot{ min-height:37px; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- Screen 1: task explanation -- holds for the average reading time before the proceed button appears -->
+<div class="wrap" id="instructionsWrap">
+  <div class="screen-inner">
+    <h2 class="screen-title">How this task works</h2>
+    <p class="screen-text" id="instructionsText"></p>
+    <div class="board-actions proceed-slot">
+      <button class="action submit" id="proceedBtn" style="visibility:hidden;" onclick="goToSandbox()">Proceed</button>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 2: sandbox -- try every option at least once before continuing -->
+<div class="wrap" id="sandboxWrap" style="display:none;">
+  <div class="top">
+    <div class="prompt-label">Warm-up</div>
+  </div>
+
+  <div class="pentagon-wrap" id="sandboxPentagonWrap">
+    <div class="pent-slot pent-0" id="sandbox-prop-slot-0"></div>
+    <div class="pent-slot pent-1" id="sandbox-prop-slot-1"></div>
+    <div class="pent-slot pent-2" id="sandbox-prop-slot-2"></div>
+    <div class="pent-slot pent-3" id="sandbox-prop-slot-3"></div>
+    <div class="pent-slot pent-4" id="sandbox-prop-slot-4"></div>
+
+    <div class="core-stack">
+      <div class="box-unit">
+        <div class="box" id="sandboxBox"></div>
+        <div class="box-caption">Preview</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sandbox-progress" id="sandboxProgress">0 of 10 options tried</div>
+  <div class="board-actions">
+    <button class="action submit" id="sandboxContinueBtn" disabled onclick="goToTask()">Continue</button>
+  </div>
+</div>
+
+<!-- Screen 3: the task itself, unchanged -->
+<div class="wrap" id="taskWrap" style="display:none;">
   <div class="top">
     <div class="prompt-label">Match this shape:</div>
     <div class="stats" id="statsText"></div>
@@ -226,6 +288,7 @@
     <div class="core-stack">
       <div class="box-unit">
         <div class="box" id="shapeBox"></div>
+        <div class="box-caption">Yours</div>
       </div>
       <div class="word-square" id="wordSquare">
         <div class="word-float" id="wordFloat"></div>
@@ -395,21 +458,24 @@ function renderInto(el, spec, viewBoxSize, cx, cy, context){
 const ICON_VB = 120;
 const ICON_CENTER = 60;
 
-function previewIconSvg(catKey, optId){
+function iconSvgFor(shape, catKey, optId, context){
   const spec = {
-    shape: state.target.shape,
+    shape,
     size:'large', texture:null,
     color: (catKey === 'color' ? null : 'black'),
     lineWidth:null, motion:null
   };
   spec[catKey] = optId;
-  const context = 'prev_' + catKey + '_' + optId;
   const strokeMultiplier = (catKey === 'color') ? 2 : 1;
   const { def, shapeSvg, motionClass } = specToSvg(spec, ICON_CENTER, ICON_CENTER, context, strokeMultiplier);
   return `<svg viewBox="0 0 ${ICON_VB} ${ICON_VB}">
     <defs>${def}</defs>
     <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;">${shapeSvg}</g>
   </svg>`;
+}
+
+function previewIconSvg(catKey, optId){
+  return iconSvgFor(state.target.shape, catKey, optId, 'prev_' + catKey + '_' + optId);
 }
 
 /* ---------------------------------------------------------------
@@ -608,7 +674,91 @@ function startWordFloat(){
   });
 }
 
-newTrial();
+/* ---------------------------------------------------------------
+   Screen 1: task explanation. Holds for roughly the average time it
+   takes to silently read the instructions (~200 words per minute)
+   before the Proceed button becomes available, so it can't be
+   skipped instantly.
+---------------------------------------------------------------- */
+const TASK_INSTRUCTIONS_TEXT = "In each trial, five words float inside the square beneath your build box. Together they describe the hidden target's size, texture, color, line width, and motion. Use the property options arranged around the build box to recreate the target: choose the matching option for each of the five properties. Once your build matches everything the floating words describe, click Submit to lock it in and move to the next trial.";
+
+function estimateReadingMs(text){
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const AVERAGE_READING_WPM = 200;
+  const ms = (words / AVERAGE_READING_WPM) * 60000;
+  return Math.max(3000, Math.round(ms));
+}
+
+function showInstructions(){
+  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
+  const btn = document.getElementById('proceedBtn');
+  btn.style.visibility = 'hidden';
+  setTimeout(()=>{ btn.style.visibility = 'visible'; }, estimateReadingMs(TASK_INSTRUCTIONS_TEXT));
+}
+
+function goToSandbox(){
+  document.getElementById('instructionsWrap').style.display = 'none';
+  document.getElementById('sandboxWrap').style.display = '';
+}
+
+/* ---------------------------------------------------------------
+   Screen 2: sandbox. A free-play preview box surrounded by the same
+   pentagon of property controls used in the real task, unconnected
+   to any target -- purely so the user sees what every individual
+   option looks like before the real task's scoring begins. "Tried" =
+   clicked that specific option (10 total: 5 properties x 2 options
+   each). Continue unlocks only once all ten have been clicked.
+---------------------------------------------------------------- */
+let sandboxState = {
+  shape: pickRandom(SHAPES),
+  build: { size:null, texture:null, color:null, lineWidth:null, motion:null }
+};
+const triedOptions = new Set();
+const TOTAL_SANDBOX_OPTIONS = CATEGORIES.reduce((n, cat) => n + cat.options.length, 0);
+
+function renderSandbox(){
+  renderInto(document.getElementById('sandboxBox'), { shape: sandboxState.shape, ...sandboxState.build }, 200, 100, 100, 'sandbox');
+
+  CATEGORIES.forEach((cat, i)=>{
+    const el = document.getElementById('sandbox-prop-slot-' + i);
+    const opts = cat.options.map(opt=>{
+      const selected = sandboxState.build[cat.key] === opt.id;
+      const ctx = 'sandbox_' + cat.key + '_' + opt.id;
+      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="sandboxSelect('${cat.key}','${opt.id}')">${iconSvgFor(sandboxState.shape, cat.key, opt.id, ctx)}</button>`;
+    }).join('');
+    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+  });
+
+  updateSandboxProgress();
+}
+
+function sandboxSelect(catKey, optId){
+  sandboxState.build[catKey] = sandboxState.build[catKey] === optId ? null : optId;
+  triedOptions.add(catKey + ':' + optId);
+  renderSandbox();
+}
+
+function updateSandboxProgress(){
+  const n = triedOptions.size;
+  document.getElementById('sandboxProgress').textContent = `${n} of ${TOTAL_SANDBOX_OPTIONS} options tried`;
+  document.getElementById('sandboxContinueBtn').disabled = n < TOTAL_SANDBOX_OPTIONS;
+}
+
+function initSandbox(){
+  renderSandbox();
+}
+
+/* ---------------------------------------------------------------
+   Screen 3: hand off to the task, unchanged from here on.
+---------------------------------------------------------------- */
+function goToTask(){
+  document.getElementById('sandboxWrap').style.display = 'none';
+  document.getElementById('taskWrap').style.display = '';
+  newTrial();
+}
+
+initSandbox();
+showInstructions();
 </script>
 </body>
 </html>
