@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Shape Copy</title>
+<title>Image Guided Task</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -579,7 +579,7 @@ function renderProperties(){
 
 function updateStats(){
   document.getElementById('statsText').textContent =
-    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
+    `Trial ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS}`;
 }
 
 /* ---------------------------------------------------------------
