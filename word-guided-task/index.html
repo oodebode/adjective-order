@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -59,16 +59,15 @@
     overflow:visible;
   }
   .box svg{overflow:visible;}
-  /* fixed across every trial -- only the shape drawn inside changes */
-  #shapeBox{ width:140px; height:140px; }
+  /* fixed across every trial -- only the shape drawn inside changes.
+     Yours, the Target word-square, and the sandbox Preview box are
+     all kept the same, larger size. */
+  #shapeBox, #sandboxBox, .word-square{ width:200px; height:200px; }
 
   /* the square where the target's descriptive words float continuously
-     -- always visible, no transition or separate "question" step.
-     Sized/positioned to match the box it replaced. */
+     -- always visible, no transition or separate "question" step. */
   .word-square{
     position:relative;
-    width:140px;
-    height:140px;
     background:var(--board-bg);
     border:1px solid var(--gray-line);
     border-radius:4px;
@@ -132,14 +131,26 @@
   .pent-3{ top:88%;   left:25%;   }
   .pent-4{ top:32%;   left:11%;   }
 
-  .prop-label{
-    font-size:12px;
-    color:var(--gray-label);
-    text-align:center;
-  }
   .prop-options{
     display:flex;
     gap:8px;
+  }
+  .opt-unit{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    user-select:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
+  }
+  .opt-label{
+    font-size:11px;
+    color:var(--gray-label);
+    text-align:center;
+    user-select:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
   }
 
   .board-actions{
@@ -208,59 +219,65 @@
     50%{transform:rotate(9deg);}
   }
 
-  /* ---- pre-task screens: sandbox + instructions ---- */
-  .screen-inner{
-    max-width:520px;
-    margin:0 auto;
+  /* ---- pre-task screen: merged instructions + sandbox ---- */
+  .intro-top{
     display:flex;
-    flex-direction:column;
     align-items:center;
-    gap:16px;
-    text-align:center;
+    justify-content:flex-start;
+    gap:24px;
+    margin:10px 0 22px;
+    flex-wrap:wrap;
   }
-  #instructionsWrap{
-    min-height:80vh;
+  .intro-left{
+    flex:0 1 220px;
+    max-width:220px;
+    text-align:left;
+  }
+  .task-words-col{
     display:flex;
-    align-items:center;
     justify-content:center;
   }
-  .screen-title{ font-size:20px; margin:0; }
+  .intro-right{
+    flex:1 1 560px;
+    display:flex;
+    justify-content:center;
+  }
+  .sandbox-pentagon{
+    width:min(92vw, 640px);
+    margin-top:50px;
+  }
+  .screen-title{ font-size:20px; margin:0 0 10px; }
   .screen-text{ font-size:15px; line-height:1.65; color:#333; margin:0; }
-  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; }
+  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; text-align:center; }
   button.action:disabled{ opacity:.4; cursor:not-allowed; }
-  .proceed-slot{ min-height:37px; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
 <body>
 
-<!-- Screen 1: task explanation -- holds for the average reading time before the proceed button appears -->
-<div class="wrap" id="instructionsWrap">
-  <div class="screen-inner">
-    <h2 class="screen-title">How this task works</h2>
-    <p class="screen-text" id="instructionsText"></p>
-    <div class="board-actions proceed-slot">
-      <button class="action submit" id="proceedBtn" style="visibility:hidden;" onclick="goToSandbox()">Proceed</button>
+<!-- Merged intro + sandbox screen: instructions on the left, the building
+     space (same shape outline / same size as the box used in the real
+     task) on the right, no reading-time gate -- the sandbox controls
+     are simply available immediately underneath. -->
+<div class="wrap" id="sandboxWrap">
+  <div class="intro-top">
+    <div class="intro-left">
+      <h2 class="screen-title">How this task works</h2>
+      <p class="screen-text" id="instructionsText"></p>
     </div>
-  </div>
-</div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon" id="sandboxPentagonWrap">
+        <div class="pent-slot pent-0" id="sandbox-prop-slot-0"></div>
+        <div class="pent-slot pent-1" id="sandbox-prop-slot-1"></div>
+        <div class="pent-slot pent-2" id="sandbox-prop-slot-2"></div>
+        <div class="pent-slot pent-3" id="sandbox-prop-slot-3"></div>
+        <div class="pent-slot pent-4" id="sandbox-prop-slot-4"></div>
 
-<!-- Screen 2: sandbox -- try every option at least once before continuing -->
-<div class="wrap" id="sandboxWrap" style="display:none;">
-  <div class="top">
-    <div class="prompt-label">Warm-up</div>
-  </div>
-
-  <div class="pentagon-wrap" id="sandboxPentagonWrap">
-    <div class="pent-slot pent-0" id="sandbox-prop-slot-0"></div>
-    <div class="pent-slot pent-1" id="sandbox-prop-slot-1"></div>
-    <div class="pent-slot pent-2" id="sandbox-prop-slot-2"></div>
-    <div class="pent-slot pent-3" id="sandbox-prop-slot-3"></div>
-    <div class="pent-slot pent-4" id="sandbox-prop-slot-4"></div>
-
-    <div class="core-stack">
-      <div class="box-unit">
-        <div class="box" id="sandboxBox"></div>
-        <div class="box-caption">Preview</div>
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="sandboxBox"></div>
+            <div class="box-caption">Preview</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -278,20 +295,29 @@
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="pentagon-wrap" id="pentagonWrap">
-    <div class="pent-slot pent-0" id="prop-slot-0"></div>
-    <div class="pent-slot pent-1" id="prop-slot-1"></div>
-    <div class="pent-slot pent-2" id="prop-slot-2"></div>
-    <div class="pent-slot pent-3" id="prop-slot-3"></div>
-    <div class="pent-slot pent-4" id="prop-slot-4"></div>
-
-    <div class="core-stack">
+  <div class="intro-top">
+    <div class="intro-left task-words-col">
       <div class="box-unit">
-        <div class="box" id="shapeBox"></div>
-        <div class="box-caption">Yours</div>
+        <div class="word-square" id="wordSquare">
+          <div class="word-float" id="wordFloat"></div>
+        </div>
+        <div class="box-caption">Target</div>
       </div>
-      <div class="word-square" id="wordSquare">
-        <div class="word-float" id="wordFloat"></div>
+    </div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon" id="pentagonWrap">
+        <div class="pent-slot pent-0" id="prop-slot-0"></div>
+        <div class="pent-slot pent-1" id="prop-slot-1"></div>
+        <div class="pent-slot pent-2" id="prop-slot-2"></div>
+        <div class="pent-slot pent-3" id="prop-slot-3"></div>
+        <div class="pent-slot pent-4" id="prop-slot-4"></div>
+
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="shapeBox"></div>
+            <div class="box-caption">Yours</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -309,18 +335,18 @@
    in the word-square below the build box, describing the TARGET's
    actual value for that property.
 ---------------------------------------------------------------- */
-const SHAPES = ['oval','square','triangle','diamond','star'];
+const SHAPES = ['triangle','oval','square'];
 
 const CATEGORIES = [
   { key:'size',      label:'Size',       options:[ {id:'small', label:'Small', word:'small'}, {id:'large', label:'Large', word:'large'} ] },
   { key:'texture',   label:'Texture',    options:[ {id:'striped', label:'Striped', word:'striped'}, {id:'dotted', label:'Dotted', word:'dotted'} ] },
-  { key:'color',     label:'Color',      options:[ {id:'blue', label:'Blue', word:'blue'}, {id:'yellow', label:'Yellow', word:'yellow'} ] },
+  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple', word:'purple'}, {id:'yellow', label:'Yellow', word:'yellow'} ] },
   { key:'lineWidth', label:'Line Width', options:[ {id:'thick', label:'Thick', word:'thick'}, {id:'thin', label:'Thin', word:'thin'} ] },
-  { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking', word:'shaking'}, {id:'rotate', label:'Rotating', word:'rotating'} ] }
+  { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking', word:'shaking'}, {id:'rotate', label:'Spinning', word:'spinning'} ] }
 ];
 
 function colorHex(id){
-  if(id === 'blue')   return '#2196F3';
+  if(id === 'purple') return '#8E24AA';
   if(id === 'yellow') return '#F5C518';
   if(id === 'black')  return '#111111';
   return '#9a9a9a'; // neutral / not-yet-chosen (live build only, never an icon)
@@ -347,12 +373,12 @@ function textureFill(texture, colorId, context){
   const id = `pat_${context}_${texture}_${colorId||'neutral'}`;
   let def = '';
   if(texture === 'striped'){
-    def = `<pattern id="${id}" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="12" height="12" fill="white"/>
-      <rect x="0" width="6" height="12" fill="${color}"/>
+    def = `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="white"/>
+      <rect x="0" width="3" height="6" fill="${color}"/>
     </pattern>`;
   } else if(texture === 'dotted'){
-    const w = 20, h = 20, r = 7.6;
+    const w = 10, h = 10, r = 3.6;
     def = `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">
       <rect width="${w}" height="${h}" fill="white"/>
       <circle cx="${w/2}" cy="${h/2}" r="${r}" fill="${color}"/>
@@ -420,6 +446,24 @@ const SIZE_FRACTION = { small: 0.22, default: 0.55, large: 0.93 };
 // R + strokeWidth/2. That keeps line width purely a property of the
 // outline ring -- it never grows or shrinks the pattern, which always
 // stops exactly at R.
+// Motion animations are keyed to a single fixed time origin rather than
+// to each element's own creation time. Every re-render replaces the SVG
+// (innerHTML), which would normally restart a CSS animation from 0 --
+// so instead we compute how far into its loop the animation SHOULD be
+// right now and apply that as a negative animation-delay, making the
+// shape's rotation/shake continue seamlessly through any property
+// change instead of snapping back to its starting position.
+const ANIM_DURATIONS = { rotate: 3, shake: 0.5 };
+const ANIM_TIME_ORIGIN = performance.now();
+
+function motionStyle(motion){
+  if(!motion) return '';
+  const duration = ANIM_DURATIONS[motion];
+  const elapsed = (performance.now() - ANIM_TIME_ORIGIN) / 1000;
+  const phase = ((elapsed % duration) + duration) % duration;
+  return `animation-delay:-${phase.toFixed(3)}s;`;
+}
+
 function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
   const domainHalf = cx; // cx === cy === this domain's own half-size (100 for boxes, 60 for icons)
   const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
@@ -432,15 +476,15 @@ function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
   const outlineEl = shapeElement(spec.shape, cx, cy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
 
   const motionClass = spec.motion ? ('m-' + spec.motion) : '';
-  return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass };
+  return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass, motionStyle: motionStyle(spec.motion) };
 }
 
 function renderInto(el, spec, viewBoxSize, cx, cy, context){
-  const { def, shapeSvg, motionClass } = specToSvg(spec, cx, cy, context);
+  const { def, shapeSvg, motionClass, motionStyle } = specToSvg(spec, cx, cy, context);
   el.innerHTML = `
     <svg viewBox="0 0 ${viewBoxSize} ${viewBoxSize}" width="100%" height="100%">
       <defs>${def}</defs>
-      <g class="${motionClass}" style="transform-origin:${cx}px ${cy}px;">${shapeSvg}</g>
+      <g class="${motionClass}" style="transform-origin:${cx}px ${cy}px;${motionStyle}">${shapeSvg}</g>
     </svg>
   `;
 }
@@ -467,10 +511,10 @@ function iconSvgFor(shape, catKey, optId, context){
   };
   spec[catKey] = optId;
   const strokeMultiplier = (catKey === 'color') ? 2 : 1;
-  const { def, shapeSvg, motionClass } = specToSvg(spec, ICON_CENTER, ICON_CENTER, context, strokeMultiplier);
+  const { def, shapeSvg, motionClass, motionStyle } = specToSvg(spec, ICON_CENTER, ICON_CENTER, context, strokeMultiplier);
   return `<svg viewBox="0 0 ${ICON_VB} ${ICON_VB}">
     <defs>${def}</defs>
-    <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;">${shapeSvg}</g>
+    <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;${motionStyle}">${shapeSvg}</g>
   </svg>`;
 }
 
@@ -539,13 +583,33 @@ let state = {
 };
 
 let floatAnimHandle = null;
+let revealTimeouts = [];
 
-//  target combinations seen so far (shape + all 5 property values),
+function clearRevealTimeouts(){
+  revealTimeouts.forEach(id => clearTimeout(id));
+  revealTimeouts = [];
+}
+
+// Unique target combinations seen so far (shape + all 5 property values),
 // used to show real coverage progress out of TOTAL_POSSIBLE_TRIALS.
 const seenTrials = new Set();
 function trialKey(target){
   return [target.shape, ...CATEGORIES.map(cat => target[cat.key])].join('|');
 }
+
+/* ---------------------------------------------------------------
+   Reveal sequence at the start of every trial. The boxes and pentagon
+   slots themselves never move or resize between trials -- only what's
+   drawn inside them changes, and it changes in stages rather than all
+   at once:
+     1. everything clears (blank build box, blank word square, blank
+        prop slots)
+     2. after a delay, the target's descriptive words start floating
+     3. after another delay, the plain (unbuilt) outline appears
+     4. after another delay, every option for every property appears
+        together, all at once
+---------------------------------------------------------------- */
+const REVEAL_DELAY_MS = 750;
 
 function newTrial(){
   if(stimulusIndex >= stimulusOrder.length){
@@ -568,10 +632,42 @@ function newTrial(){
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
   });
 
-  render();
+  clearRevealTimeouts();
+  if(floatAnimHandle){ cancelAnimationFrame(floatAnimHandle); floatAnimHandle = null; }
+
+  // Stage 1 (immediate): all shapes disappear -- blank build box, blank
+  // property slots, blank word square.
+  document.getElementById('shapeBox').innerHTML = '';
+  document.getElementById('wordFloat').querySelectorAll('.wf-word').forEach(el=>el.remove());
+  state.slotOrder.forEach((catKey, i)=>{
+    document.getElementById('prop-slot-' + i).innerHTML = '';
+  });
+  updateStats();
+  updateSubmitState();
+
+  // Stage 2: the target's words start floating.
+  revealTimeouts.push(setTimeout(()=>{
+    startWordFloat();
+  }, REVEAL_DELAY_MS));
+
+  // Stage 3: the base (unbuilt) outline appears.
+  revealTimeouts.push(setTimeout(()=>{
+    renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
+  }, REVEAL_DELAY_MS * 2));
+
+  // Stage 4: every option, for every property, appears together at once.
+  revealTimeouts.push(setTimeout(()=>{
+    renderProperties();
+    updateSubmitState();
+  }, REVEAL_DELAY_MS * 3));
+}
+
+function allPropertiesSelected(){
+  return CATEGORIES.every(cat => state.build[cat.key] !== null);
 }
 
 function submitTrial(){
+  if(!allPropertiesSelected()) return; // guard; the button is disabled too
   newTrial();
 }
 
@@ -581,19 +677,24 @@ function selectOption(catKey, optId){
 }
 
 /* ---------------------------------------------------------------
-   Rendering. The pentagon's five vertex positions and the box
-   sizes/positions are fixed in the markup/CSS and never move between
-   trials -- no transition screen, no separate "question" step; the
-   target, an empty build, and the floating words for this trial's
-   target simply appear together the instant a trial starts. Only the
-   target spec, the build state, and which property/option sits where
-   are refreshed each round.
+   Rendering for in-trial changes (picking/unpicking an option). The
+   pentagon's five vertex positions and the box sizes/positions are
+   fixed in the markup/CSS and never move -- only what's drawn inside
+   them changes, and it changes instantly here (the staged reveal only
+   happens once, at the start of a trial -- see newTrial()). The moving
+   words are NOT restarted here -- see startWordFloat's call site in
+   newTrial().
 ---------------------------------------------------------------- */
 function render(){
   renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
   renderProperties();
   updateStats();
-  startWordFloat();
+  updateSubmitState();
+}
+
+function updateSubmitState(){
+  // subject must choose an option for every property before advancing
+  document.getElementById('submitBtn').disabled = !allPropertiesSelected();
 }
 
 function renderProperties(){
@@ -604,15 +705,15 @@ function renderProperties(){
     const opts = order.map(optId=>{
       const opt = cat.options.find(o=>o.id === optId);
       const selected = state.build[catKey] === optId;
-      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${previewIconSvg(catKey, optId)}</button>`;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="selectOption('${catKey}','${optId}')">${previewIconSvg(catKey, optId)}</button><div class="opt-label">${opt.label}</div></div>`;
     }).join('');
-    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
   });
 }
 
 function updateStats(){
   document.getElementById('statsText').textContent =
-    `Trial ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS}`;
+    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
 }
 
 /* ---------------------------------------------------------------
@@ -723,40 +824,19 @@ function startWordFloat(){
 }
 
 /* ---------------------------------------------------------------
-   Screen 1: task explanation. Holds for roughly the average time it
-   takes to silently read the instructions (~200 words per minute)
-   before the Proceed button becomes available, so it can't be
-   skipped instantly.
+   Merged intro + sandbox screen. The instructions are simply shown
+   immediately (no reading-time gate / no Proceed button) alongside
+   the building space -- a free-play preview box, using the same
+   shape outline and the same size as the box used in the real task
+   -- and the sandbox controls underneath are live right away.
+   "Tried" = clicked that specific option (10 total: 5 properties x 2
+   options each). Continue unlocks only once all ten have been
+   clicked. The slot order (which property sits where) and each
+   property's option order are randomized once, the same way the
+   real task randomizes them every trial.
 ---------------------------------------------------------------- */
 const TASK_INSTRUCTIONS_TEXT = "In each trial, five words float inside the square beneath your build box. Together they describe the hidden target's size, texture, color, line width, and motion. Use the property options arranged around the build box to recreate the target: choose the matching option for each of the five properties. Once your build matches everything the floating words describe, click Submit to lock it in and move to the next trial.";
 
-function estimateReadingMs(text){
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const AVERAGE_READING_WPM = 200;
-  const ms = (words / AVERAGE_READING_WPM) * 60000;
-  return Math.max(3000, Math.round(ms));
-}
-
-function showInstructions(){
-  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
-  const btn = document.getElementById('proceedBtn');
-  btn.style.visibility = 'hidden';
-  setTimeout(()=>{ btn.style.visibility = 'visible'; }, estimateReadingMs(TASK_INSTRUCTIONS_TEXT));
-}
-
-function goToSandbox(){
-  document.getElementById('instructionsWrap').style.display = 'none';
-  document.getElementById('sandboxWrap').style.display = '';
-}
-
-/* ---------------------------------------------------------------
-   Screen 2: sandbox. A free-play preview box surrounded by the same
-   pentagon of property controls used in the real task, unconnected
-   to any target -- purely so the user sees what every individual
-   option looks like before the real task's scoring begins. "Tried" =
-   clicked that specific option (10 total: 5 properties x 2 options
-   each). Continue unlocks only once all ten have been clicked.
----------------------------------------------------------------- */
 let sandboxState = {
   shape: pickRandom(SHAPES),
   build: { size:null, texture:null, color:null, lineWidth:null, motion:null }
@@ -764,17 +844,28 @@ let sandboxState = {
 const triedOptions = new Set();
 const TOTAL_SANDBOX_OPTIONS = CATEGORIES.reduce((n, cat) => n + cat.options.length, 0);
 
+// randomized once: which property lands in which slot, and the
+// left-to-right order of each property's own options
+let sandboxSlotOrder = shuffle(CATEGORIES.map(c=>c.key));
+let sandboxOptionOrder = {};
+CATEGORIES.forEach(cat=>{
+  sandboxOptionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
+});
+
 function renderSandbox(){
   renderInto(document.getElementById('sandboxBox'), { shape: sandboxState.shape, ...sandboxState.build }, 200, 100, 100, 'sandbox');
 
-  CATEGORIES.forEach((cat, i)=>{
+  sandboxSlotOrder.forEach((catKey, i)=>{
+    const cat = CATEGORIES.find(c=>c.key === catKey);
     const el = document.getElementById('sandbox-prop-slot-' + i);
-    const opts = cat.options.map(opt=>{
-      const selected = sandboxState.build[cat.key] === opt.id;
-      const ctx = 'sandbox_' + cat.key + '_' + opt.id;
-      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="sandboxSelect('${cat.key}','${opt.id}')">${iconSvgFor(sandboxState.shape, cat.key, opt.id, ctx)}</button>`;
+    const order = sandboxOptionOrder[catKey];
+    const opts = order.map(optId=>{
+      const opt = cat.options.find(o=>o.id === optId);
+      const selected = sandboxState.build[catKey] === optId;
+      const ctx = 'sandbox_' + catKey + '_' + optId;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="sandboxSelect('${catKey}','${optId}')">${iconSvgFor(sandboxState.shape, catKey, optId, ctx)}</button><div class="opt-label">${opt.label}</div></div>`;
     }).join('');
-    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
   });
 
   updateSandboxProgress();
@@ -793,11 +884,12 @@ function updateSandboxProgress(){
 }
 
 function initSandbox(){
+  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
   renderSandbox();
 }
 
 /* ---------------------------------------------------------------
-   Screen 3: hand off to the task, unchanged from here on.
+   Hand off to the task, unchanged from here on.
 ---------------------------------------------------------------- */
 function goToTask(){
   document.getElementById('sandboxWrap').style.display = 'none';
@@ -806,7 +898,6 @@ function goToTask(){
 }
 
 initSandbox();
-showInstructions();
 </script>
 </body>
 </html>
