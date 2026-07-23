@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -481,15 +481,37 @@ function previewIconSvg(catKey, optId){
 /* ---------------------------------------------------------------
    State
 ---------------------------------------------------------------- */
-let state = {
-  target: null,
-  build: { size:null, texture:null, color:null, lineWidth:null, motion:null },
-  trialCount: 0,
-  slotOrder: [],   // slotOrder[i] = category key placed in pentagon position i, re-shuffled every trial
-  optionOrder: {}  // optionOrder[catKey] = shuffled option-id order, re-shuffled every trial
-};
+/* ---------------------------------------------------------------
+   Stimulus database: every one of the 2^n * m possible target
+   combinations (n = CATEGORIES.length binary properties, m =
+   SHAPES.length shapes) is generated once, up front, as a fixed list
+   -- not sampled randomly trial to trial. Each user gets their own
+   shuffled ORDER over this same fixed set, so across a full pass
+   every user sees all 160 stimuli exactly once each, just in a
+   different (randomized) sequence.
+---------------------------------------------------------------- */
+function generateStimulusDatabase(){
+  let combos = [{}];
+  CATEGORIES.forEach(cat=>{
+    const next = [];
+    combos.forEach(partial=>{
+      cat.options.forEach(opt=>{
+        next.push({ ...partial, [cat.key]: opt.id });
+      });
+    });
+    combos = next;
+  });
+  const db = [];
+  SHAPES.forEach(shape=>{
+    combos.forEach(propCombo=>{
+      db.push({ shape, ...propCombo });
+    });
+  });
+  return db; // length === SHAPES.length * 2^CATEGORIES.length
+}
 
-let floatAnimHandle = null;
+const STIMULUS_DB = generateStimulusDatabase();
+const TOTAL_POSSIBLE_TRIALS = STIMULUS_DB.length; // 2^n * m
 
 function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
@@ -502,16 +524,41 @@ function shuffle(arr){
   return a;
 }
 
+// This user's randomized presentation order over the fixed database.
+// Reshuffled fresh (a new full pass) each time it's exhausted, so
+// coverage is always complete before anything repeats.
+let stimulusOrder = shuffle(STIMULUS_DB);
+let stimulusIndex = 0;
+
+let state = {
+  target: null,
+  build: { size:null, texture:null, color:null, lineWidth:null, motion:null },
+  trialCount: 0,
+  slotOrder: [],   // slotOrder[i] = category key placed in pentagon position i, re-shuffled every trial
+  optionOrder: {}  // optionOrder[catKey] = shuffled option-id order, re-shuffled every trial
+};
+
+let floatAnimHandle = null;
+
+// Unique target combinations seen so far (shape + all 5 property values),
+// used to show real coverage progress out of TOTAL_POSSIBLE_TRIALS.
+const seenTrials = new Set();
+function trialKey(target){
+  return [target.shape, ...CATEGORIES.map(cat => target[cat.key])].join('|');
+}
+
 function newTrial(){
-  const shape = pickRandom(SHAPES);
-  const target = { shape };
-  CATEGORIES.forEach(cat=>{
-    target[cat.key] = pickRandom(cat.options).id;
-  });
+  if(stimulusIndex >= stimulusOrder.length){
+    stimulusOrder = shuffle(STIMULUS_DB);
+    stimulusIndex = 0;
+  }
+  const target = { ...stimulusOrder[stimulusIndex] };
+  stimulusIndex += 1;
 
   state.target = target;
   state.build = { size:null, texture:null, color:null, lineWidth:null, motion:null };
   state.trialCount += 1;
+  seenTrials.add(trialKey(target));
 
   // which pentagon vertex each property lands in, re-randomized every trial
   state.slotOrder = shuffle(CATEGORIES.map(c=>c.key));
@@ -564,7 +611,8 @@ function renderProperties(){
 }
 
 function updateStats(){
-  document.getElementById('statsText').textContent = `Trial ${state.trialCount}`;
+  document.getElementById('statsText').textContent =
+    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
 }
 
 /* ---------------------------------------------------------------
