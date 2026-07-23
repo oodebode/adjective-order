@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Shape Copy</title>
+<title>Word Guided Task</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -540,7 +540,7 @@ let state = {
 
 let floatAnimHandle = null;
 
-// Unique target combinations seen so far (shape + all 5 property values),
+//  target combinations seen so far (shape + all 5 property values),
 // used to show real coverage progress out of TOTAL_POSSIBLE_TRIALS.
 const seenTrials = new Set();
 function trialKey(target){
@@ -612,7 +612,7 @@ function renderProperties(){
 
 function updateStats(){
   document.getElementById('statsText').textContent =
-    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
+    `Trial ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS}`;
 }
 
 /* ---------------------------------------------------------------
