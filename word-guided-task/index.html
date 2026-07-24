@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -48,6 +48,7 @@
   .box-caption{
     font-size:12px;
     color:var(--gray-label);
+    min-height:15px;
   }
   .box{
     background:var(--board-bg);
@@ -148,6 +149,7 @@
     font-size:11px;
     color:var(--gray-label);
     text-align:center;
+    min-height:14px;
     user-select:none;
     -webkit-user-select:none;
     -moz-user-select:none;
@@ -183,6 +185,8 @@
     justify-content:center;
     line-height:0;
     flex:0 0 auto;
+    width:70px;
+    height:70px;
     transition:border-color .15s ease, transform .1s ease;
   }
   .opt svg{width:56px;height:56px;display:block;}
@@ -275,6 +279,7 @@
         <div class="core-stack">
           <div class="box-unit">
             <div class="box" id="sandboxBox"></div>
+            <div class="box-caption">Preview</div>
           </div>
         </div>
       </div>
@@ -300,7 +305,7 @@
         <div class="word-square" id="wordSquare">
           <div class="word-float" id="wordFloat"></div>
         </div>
-        <div class="box-caption">Target</div>
+        <div class="box-caption" id="targetCaption"></div>
       </div>
     </div>
     <div class="intro-right">
@@ -314,7 +319,7 @@
         <div class="core-stack">
           <div class="box-unit">
             <div class="box" id="shapeBox"></div>
-            <div class="box-caption">Yours</div>
+            <div class="box-caption" id="yoursCaption"></div>
           </div>
         </div>
       </div>
@@ -634,13 +639,15 @@ function newTrial(){
   clearRevealTimeouts();
   if(floatAnimHandle){ cancelAnimationFrame(floatAnimHandle); floatAnimHandle = null; }
 
-  // Stage 1 (immediate): all shapes disappear -- blank build box, blank
-  // property slots, blank word square.
+  // Stage 1 (immediate): the shapes inside every box disappear, but the
+  // boxes themselves -- Yours, Target, and every property option -- are
+  // drawn now and stay put for the rest of the trial. Property boxes are
+  // drawn as empty shells (still correctly wired to their eventual
+  // option) so their icon + label can fill in later without the box
+  // itself appearing or moving.
   document.getElementById('shapeBox').innerHTML = '';
   document.getElementById('wordFloat').querySelectorAll('.wf-word').forEach(el=>el.remove());
-  state.slotOrder.forEach((catKey, i)=>{
-    document.getElementById('prop-slot-' + i).innerHTML = '';
-  });
+  renderPropertyShells();
   updateStats();
   updateSubmitState();
 
@@ -654,7 +661,7 @@ function newTrial(){
     renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
   }, REVEAL_DELAY_MS * 2));
 
-  // Stage 4: every option, for every property, appears together at once.
+  // Stage 4: every option box's icon + label fill in together, all at once.
   revealTimeouts.push(setTimeout(()=>{
     renderProperties();
     updateSubmitState();
@@ -710,9 +717,25 @@ function renderProperties(){
   });
 }
 
+// Draws just the empty option boxes -- same positions, same count, same
+// click targets -- with no icon or label inside yet. Used at the very
+// start of a trial so the boxes themselves are present the whole time;
+// renderProperties() later fills in each box's icon + label on the delay.
+function renderPropertyShells(){
+  state.slotOrder.forEach((catKey, i)=>{
+    const el = document.getElementById('prop-slot-' + i);
+    const order = state.optionOrder[catKey];
+    const opts = order.map(optId=>{
+      const selected = state.build[catKey] === optId;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="selectOption('${catKey}','${optId}')"></button><div class="opt-label"></div></div>`;
+    }).join('');
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
+  });
+}
+
 function updateStats(){
   document.getElementById('statsText').textContent =
-    `Trial ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS}`;
+    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
 }
 
 /* ---------------------------------------------------------------
@@ -834,7 +857,7 @@ function startWordFloat(){
    property's option order are randomized once, the same way the
    real task randomizes them every trial.
 ---------------------------------------------------------------- */
-const TASK_INSTRUCTIONS_TEXT = "Your job is to craft an image from the basic outline provided to the right. You have complete control over how the resulting shape looks, based on the properties we give you. Once your build matches everything the floating words describe, click Submit to lock it in and move to the next trial.";
+const TASK_INSTRUCTIONS_TEXT = "In each trial, five words float inside the square beneath your build box. Together they describe the hidden target's size, texture, color, line width, and motion. Use the property options arranged around the build box to recreate the target: choose the matching option for each of the five properties. Once your build matches everything the floating words describe, click Submit to lock it in and move to the next trial.";
 
 let sandboxState = {
   shape: pickRandom(SHAPES),
