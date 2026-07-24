@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Image Guided Task</title>
+<title>Shape Copy</title>
 <style>
   :root{
     --gray-label: #8a8a8a;
@@ -17,7 +17,7 @@
     color:#222;
     padding:14px 16px 18px;
   }
-  .wrap{max-width:840px;width:100%;margin:0 auto;position:relative;}
+  .wrap{max-width:940px;width:100%;margin:0 auto;position:relative;}
 
   .top{
     display:flex;
@@ -48,6 +48,7 @@
   .box-caption{
     font-size:12px;
     color:var(--gray-label);
+    min-height:15px;
   }
   .box{
     background:var(--board-bg);
@@ -59,11 +60,37 @@
     overflow:visible;
   }
   .box svg{overflow:visible;}
-  #targetBox{ width:150px; height:150px; }
-  #board{ width:150px; height:150px; }
+  /* fixed across every trial -- only the shape drawn inside changes.
+     Yours, the Target image-square, and the sandbox Preview box are
+     all kept the same, larger size. */
+  #shapeBox, #sandboxBox, .target-square{ width:200px; height:200px; }
 
-  /* ---- core: target stacked above build, held fixed at the center
-     of the pentagon so both stay put while only their contents change ---- */
+  /* the square where the target IMAGE sits, anchored dead-center --
+     always visible, no transition or separate "question" step. Same
+     box, same size as the word-square it replaces; only the thing
+     drawn inside (one rendered shape, not word pills) changed. */
+  .target-square{
+    position:relative;
+    background:var(--board-bg);
+    border:1px solid var(--gray-line);
+    border-radius:4px;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .target-float{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .tf-shape{
+    line-height:0;
+  }
+
+  /* core: target, build, and the target-float square stacked together,
+     held fixed at the pentagon's center so their position/size never
+     move between trials -- only what's drawn inside them changes */
   .core-stack{
     position:absolute;
     top:50%; left:50%;
@@ -74,15 +101,14 @@
     gap:10px;
   }
 
-  /* ---- pentagon: fixed geometry, never changes between trials.
-     Wraps BOTH the target and the build space together, so the five
-     property panels sit around the whole target+yours core. Height
-     exceeds width to match the tall core stack, keeping everything
-     inside one screen. ---- */
+  /* pentagon: five fixed vertex positions wrap around the whole
+     target + build + target-float core. WHICH property lands in which
+     vertex is reshuffled every trial in JS -- these five positions
+     themselves never move. */
   .pentagon-wrap{
     position:relative;
-    width:min(94vw, 720px);
-    aspect-ratio:150/132;
+    width:min(94vw, 780px);
+    aspect-ratio:160/150;
     margin:0 auto;
   }
   .pent-slot{
@@ -92,33 +118,42 @@
     flex-direction:column;
     align-items:center;
     gap:6px;
-    width:150px;
+    width:160px;
   }
-  /* fixed pentagon vertex positions (top, upper-right, lower-right, lower-left, upper-left),
-     stretched taller than wide to wrap around the stacked target+build core.
-     WHICH property lands in which vertex is randomized fresh each trial in JS --
-     these five positions themselves never move. */
-  .pent-0{ top:7%;    left:50%;   }
-  .pent-1{ top:34%;   left:88%;   }
-  .pent-2{ top:85%;   left:75%;   }
-  .pent-3{ top:85%;   left:25%;   }
-  .pent-4{ top:34%;   left:12%;   }
+  .pent-0{ top:4%;    left:50%;   }
+  .pent-1{ top:32%;   left:89%;   }
+  .pent-2{ top:88%;   left:75%;   }
+  .pent-3{ top:88%;   left:25%;   }
+  .pent-4{ top:32%;   left:11%;   }
 
-  .prop-label{
-    font-size:12px;
-    color:var(--gray-label);
-    text-align:center;
-  }
   .prop-options{
     display:flex;
     gap:8px;
+  }
+  .opt-unit{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    user-select:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
+  }
+  .opt-label{
+    font-size:11px;
+    color:var(--gray-label);
+    text-align:center;
+    min-height:14px;
+    user-select:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
   }
 
   .board-actions{
     display:flex;
     justify-content:center;
     gap:10px;
-    margin-top:12px;
+    margin-top:14px;
   }
   button.action{
     font-family:inherit;
@@ -144,13 +179,15 @@
     justify-content:center;
     line-height:0;
     flex:0 0 auto;
+    width:70px;
+    height:70px;
     transition:border-color .15s ease, transform .1s ease;
   }
-  .opt svg{width:48px;height:48px;display:block;}
+  .opt svg{width:56px;height:56px;display:block;}
   .opt:hover{transform:translateY(-1px);}
   .opt.selected{border-color:#111;}
 
-  @media (max-width:720px){
+  @media (max-width:780px){
     .pentagon-wrap{
       width:100%;
       aspect-ratio:auto;
@@ -164,9 +201,11 @@
     .pent-slot{ position:static; transform:none; width:auto; order:initial; }
   }
 
-  /* motion animations, applied to the inner <g> that wraps the shape.
-     transform-origin is set inline per-instance so it always rotates
-     about the shape's own center, in board coords or icon coords alike. */
+  /* motion animations, applied to the <g> wrapping the shape. Duration
+     is fixed regardless of shape size or which box it's drawn in, so
+     small-rotating and large-rotating always turn at the same rate,
+     and the build always rotates/shakes in lockstep with the target
+     image. */
   .m-rotate{ animation: rotateAnim 3s linear infinite; }
   .m-shake{  animation: shakeAnim 0.5s ease-in-out infinite; }
 
@@ -179,59 +218,65 @@
     50%{transform:rotate(9deg);}
   }
 
-  /* ---- pre-task screens: instructions + sandbox ---- */
-  .screen-inner{
-    max-width:520px;
-    margin:0 auto;
+  /* ---- pre-task screen: merged instructions + sandbox ---- */
+  .intro-top{
     display:flex;
-    flex-direction:column;
     align-items:center;
-    gap:16px;
-    text-align:center;
+    justify-content:flex-start;
+    gap:24px;
+    margin:10px 0 22px;
+    flex-wrap:wrap;
   }
-  #instructionsWrap{
-    min-height:80vh;
+  .intro-left{
+    flex:0 1 220px;
+    max-width:220px;
+    text-align:left;
+  }
+  .task-image-col{
     display:flex;
-    align-items:center;
     justify-content:center;
   }
-  .screen-title{ font-size:20px; margin:0; }
+  .intro-right{
+    flex:1 1 560px;
+    display:flex;
+    justify-content:center;
+  }
+  .sandbox-pentagon{
+    width:min(92vw, 640px);
+    margin-top:50px;
+  }
+  .screen-title{ font-size:20px; margin:0 0 10px; }
   .screen-text{ font-size:15px; line-height:1.65; color:#333; margin:0; }
-  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:12px; }
+  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; text-align:center; }
   button.action:disabled{ opacity:.4; cursor:not-allowed; }
-  .proceed-slot{ min-height:37px; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
 <body>
 
-<!-- Screen 1: task explanation -- holds for the average reading time before the proceed button appears -->
-<div class="wrap" id="instructionsWrap">
-  <div class="screen-inner">
-    <h2 class="screen-title">How this task works</h2>
-    <p class="screen-text" id="instructionsText"></p>
-    <div class="board-actions proceed-slot">
-      <button class="action submit" id="proceedBtn" style="visibility:hidden;" onclick="goToSandbox()">Proceed</button>
+<!-- Merged intro + sandbox screen: instructions on the left, the building
+     space (same shape outline / same size as the box used in the real
+     task) on the right, no reading-time gate -- the sandbox controls
+     are simply available immediately underneath. -->
+<div class="wrap" id="sandboxWrap">
+  <div class="intro-top">
+    <div class="intro-left">
+      <h2 class="screen-title">How this task works</h2>
+      <p class="screen-text" id="instructionsText"></p>
     </div>
-  </div>
-</div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon" id="sandboxPentagonWrap">
+        <div class="pent-slot pent-0" id="sandbox-prop-slot-0"></div>
+        <div class="pent-slot pent-1" id="sandbox-prop-slot-1"></div>
+        <div class="pent-slot pent-2" id="sandbox-prop-slot-2"></div>
+        <div class="pent-slot pent-3" id="sandbox-prop-slot-3"></div>
+        <div class="pent-slot pent-4" id="sandbox-prop-slot-4"></div>
 
-<!-- Screen 2: sandbox -- try every option at least once before continuing -->
-<div class="wrap" id="sandboxWrap" style="display:none;">
-  <div class="top">
-    <div class="prompt-label">Warm-up</div>
-  </div>
-
-  <div class="pentagon-wrap" id="sandboxPentagonWrap">
-    <div class="pent-slot pent-0" id="sandbox-prop-slot-0"></div>
-    <div class="pent-slot pent-1" id="sandbox-prop-slot-1"></div>
-    <div class="pent-slot pent-2" id="sandbox-prop-slot-2"></div>
-    <div class="pent-slot pent-3" id="sandbox-prop-slot-3"></div>
-    <div class="pent-slot pent-4" id="sandbox-prop-slot-4"></div>
-
-    <div class="core-stack">
-      <div class="box-unit">
-        <div class="box" id="sandboxBox"></div>
-        <div class="box-caption">Preview</div>
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="sandboxBox"></div>
+            <div class="box-caption">Preview</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -249,21 +294,29 @@
     <div class="stats" id="statsText"></div>
   </div>
 
-  <div class="pentagon-wrap" id="pentagonWrap">
-    <div class="pent-slot pent-0" id="prop-slot-0"></div>
-    <div class="pent-slot pent-1" id="prop-slot-1"></div>
-    <div class="pent-slot pent-2" id="prop-slot-2"></div>
-    <div class="pent-slot pent-3" id="prop-slot-3"></div>
-    <div class="pent-slot pent-4" id="prop-slot-4"></div>
-
-    <div class="core-stack">
+  <div class="intro-top">
+    <div class="intro-left task-image-col">
       <div class="box-unit">
-        <div class="box" id="targetBox"></div>
+        <div class="target-square" id="targetSquare">
+          <div class="target-float" id="targetFloat"></div>
+        </div>
         <div class="box-caption">Target</div>
       </div>
-      <div class="box-unit">
-        <div class="box" id="board"></div>
-        <div class="box-caption">Yours</div>
+    </div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon" id="pentagonWrap">
+        <div class="pent-slot pent-0" id="prop-slot-0"></div>
+        <div class="pent-slot pent-1" id="prop-slot-1"></div>
+        <div class="pent-slot pent-2" id="prop-slot-2"></div>
+        <div class="pent-slot pent-3" id="prop-slot-3"></div>
+        <div class="pent-slot pent-4" id="prop-slot-4"></div>
+
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="shapeBox"></div>
+            <div class="box-caption">Yours</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -275,44 +328,40 @@
 
 <script>
 /* ---------------------------------------------------------------
-   Config: shapes and the five binary property dimensions.
-   This list never changes trial to trial, so its layout (pentagon
-   slot, option order) is fixed rather than re-randomized.
+   Config: shapes and the five binary property dimensions. This list
+   never changes trial to trial; only slot/option ORDER is shuffled.
 ---------------------------------------------------------------- */
-const SHAPES = ['oval','square','triangle','diamond','star'];
+const SHAPES = ['triangle','oval','square'];
 
 const CATEGORIES = [
-  { key:'size',      label:'Size',
-    options:[ {id:'small', label:'Small'}, {id:'large', label:'Large'} ] },
-  { key:'texture',   label:'Texture',
-    options:[ {id:'striped', label:'Striped'}, {id:'dotted', label:'Dotted'} ] },
-  { key:'color',     label:'Color',
-    options:[ {id:'blue', label:'Blue'}, {id:'yellow', label:'Yellow'} ] },
-  { key:'lineWidth', label:'Line Width',
-    options:[ {id:'thick', label:'Thick'}, {id:'thin', label:'Thin'} ] },
-  { key:'motion',    label:'Motion',
-    options:[ {id:'shake', label:'Shaking'}, {id:'rotate', label:'Rotating'} ] }
+  { key:'size',      label:'Size',       options:[ {id:'small', label:'Small'}, {id:'large', label:'Large'} ] },
+  { key:'texture',   label:'Texture',    options:[ {id:'striped', label:'Striped'}, {id:'dotted', label:'Dotted'} ] },
+  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple'}, {id:'yellow', label:'Yellow'} ] },
+  { key:'lineWidth', label:'Line Width', options:[ {id:'thick', label:'Thick'}, {id:'thin', label:'Thin'} ] },
+  { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking'}, {id:'rotate', label:'Spinning'} ] }
 ];
 
 function colorHex(id){
-  if(id === 'blue')   return '#2196F3';
+  if(id === 'purple') return '#8E24AA';
   if(id === 'yellow') return '#F5C518';
   if(id === 'black')  return '#111111';
-  return '#9a9a9a'; // neutral / not-yet-chosen (used only for the live build, never for icons)
+  return '#9a9a9a'; // neutral / not-yet-chosen (live build only, never an icon)
 }
 
-function lineWidthPx(id, scale){
-  const thick = 7 * scale, thin = 1.3 * scale, def = 4 * scale;
-  if(id === 'thick') return thick;
-  if(id === 'thin')  return thin;
-  return def;
+function lineWidthUnits(id){
+  // in "board units", i.e. relative to a 100-unit domain half-size;
+  // scaled per-domain (board vs icon) at the call site.
+  if(id === 'thick') return 7;
+  if(id === 'thin')  return 1.3;
+  return 4; // default, before a line-width option is chosen
 }
 
 /* ---------------------------------------------------------------
-   Texture fills: patterns only (never a flat solid fill) so the
+   Texture fills: patterns only, never a flat solid fill, so the
    shape always reads as an outline rather than a solid block.
-   Dotted is a classic polka-dot pattern -- an evenly spaced grid of
-   clearly separated circles, each with visible white space around it.
+   Dotted is a classic polka-dot pattern: an evenly spaced square
+   grid of clearly separated circles, matching the reference swatch
+   (large, evenly spaced dots with visible background between them).
 ---------------------------------------------------------------- */
 function textureFill(texture, colorId, context){
   if(!texture) return { fill:'none', def:'' };
@@ -320,12 +369,12 @@ function textureFill(texture, colorId, context){
   const id = `pat_${context}_${texture}_${colorId||'neutral'}`;
   let def = '';
   if(texture === 'striped'){
-    def = `<pattern id="${id}" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="12" height="12" fill="white"/>
-      <rect x="0" width="6" height="12" fill="${color}"/>
+    def = `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="white"/>
+      <rect x="0" width="3" height="6" fill="${color}"/>
     </pattern>`;
   } else if(texture === 'dotted'){
-    const w = 20, h = 20, r = 6.6;
+    const w = 10, h = 10, r = 3.6;
     def = `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">
       <rect width="${w}" height="${h}" fill="white"/>
       <circle cx="${w/2}" cy="${h/2}" r="${r}" fill="${color}"/>
@@ -338,8 +387,7 @@ function textureFill(texture, colorId, context){
    Shape geometry. Every shape is drawn from a single circumradius R
    (max distance from center) around (cx,cy), so every shape occupies
    an equal-area rotation-safe footprint and rotating/shaking never
-   pushes any shape further from center than R -- regardless of size
-   tier or which motion is applied.
+   pushes any shape further from center than R.
 ---------------------------------------------------------------- */
 function starPoints(cx,cy,rOuter,rInner,n=5){
   let pts=[];
@@ -377,28 +425,47 @@ function shapeElement(shape, cx, cy, R, styleAttrs){
   }
 }
 
-// Board/target coordinate system: 200x200 viewBox, center (100,100).
-const VIEWBOX_HALF = 100;
-const EDGE_PADDING = 12;   // reserves room for the outline ring (drawn fully outside R) + a visual margin
-const SAFETY = 2;
-const SIZE_SCALE = { small:0.6, default:1.1, large:2.0, iconBaseline:1.5 };
-// Both motions (shake, rotate) sweep no further from center than R itself
-// (rotating a shape about its own center never changes its max distance
-// from that center), so the only thing BASE_RADIUS has to satisfy is that
-// the LARGE tier still fits inside the box -- letting "large" be a big,
-// confident jump from "small" while staying fully in bounds under motion.
-const BASE_RADIUS = (VIEWBOX_HALF - EDGE_PADDING - SAFETY) / SIZE_SCALE.large;
+/* ---------------------------------------------------------------
+   Size model: both the boxes (200x200 viewBox) and the icons (120x120
+   viewBox) share the same SIZE_FRACTION -- "large" always means the
+   same proportion of its own domain, whether it's drawn in the build
+   box, a property icon, or the stationary target image. Since rotate/
+   shake never push a shape further from its own center than R, the
+   only bound that matters is: R + the full outline ring (drawn
+   OUTSIDE R) must still fit inside the domain at the THICKEST line
+   width, at the LARGE size tier. Solving that once keeps every
+   combination safe.
+---------------------------------------------------------------- */
+const SIZE_FRACTION = { small: 0.22, default: 0.55, large: 0.93 };
 
-// The pattern fill is drawn at exactly R with NO stroke of its own, and the
-// outline is a separate, wider, stroke-only copy of the same shape drawn at
-// R + strokeWidth/2 (so the stroke ring spans from R outward to R+strokeWidth).
-// That keeps line width purely a property of the outline ring -- it never
-// grows/shrinks into the pattern, which always stops exactly at R.
-function specToSvg(spec, cx, cy, baseR, context, strokeMultiplier=1){
-  const scale = SIZE_SCALE[spec.size] || SIZE_SCALE.default;
-  const R = baseR * scale;
+// The pattern fill is drawn at exactly R with no stroke of its own; the
+// outline is a separate, stroke-only copy of the same shape drawn at
+// R + strokeWidth/2. That keeps line width purely a property of the
+// outline ring -- it never grows or shrinks the pattern, which always
+// stops exactly at R.
+// Motion animations are keyed to a single fixed time origin rather than
+// to each element's own creation time. Every re-render replaces the SVG
+// (innerHTML), which would normally restart a CSS animation from 0 --
+// so instead we compute how far into its loop the animation SHOULD be
+// right now and apply that as a negative animation-delay, making the
+// shape's rotation/shake continue seamlessly through any property
+// change instead of snapping back to its starting position.
+const ANIM_DURATIONS = { rotate: 3, shake: 0.5 };
+const ANIM_TIME_ORIGIN = performance.now();
+
+function motionStyle(motion){
+  if(!motion) return '';
+  const duration = ANIM_DURATIONS[motion];
+  const elapsed = (performance.now() - ANIM_TIME_ORIGIN) / 1000;
+  const phase = ((elapsed % duration) + duration) % duration;
+  return `animation-delay:-${phase.toFixed(3)}s;`;
+}
+
+function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
+  const domainHalf = cx; // cx === cy === this domain's own half-size (100 for boxes, 60 for icons)
+  const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
   const strokeColor = colorHex(spec.color);
-  const strokeWidth = lineWidthPx(spec.lineWidth, baseR / BASE_RADIUS) * strokeMultiplier;
+  const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100) * strokeMultiplier;
   const fillInfo = textureFill(spec.texture, spec.color, context);
 
   const fillEl = shapeElement(spec.shape, cx, cy, R, `fill="${fillInfo.fill}" stroke="none"`);
@@ -406,43 +473,45 @@ function specToSvg(spec, cx, cy, baseR, context, strokeMultiplier=1){
   const outlineEl = shapeElement(spec.shape, cx, cy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
 
   const motionClass = spec.motion ? ('m-' + spec.motion) : '';
-  return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass };
+  return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass, motionStyle: motionStyle(spec.motion), R, outlineR };
 }
 
-function renderInto(el, spec, viewBoxSize, cx, cy, baseR, context){
-  const { def, shapeSvg, motionClass } = specToSvg(spec, cx, cy, baseR, context);
+function renderInto(el, spec, viewBoxSize, cx, cy, context){
+  const { def, shapeSvg, motionClass, motionStyle } = specToSvg(spec, cx, cy, context);
   el.innerHTML = `
     <svg viewBox="0 0 ${viewBoxSize} ${viewBoxSize}" width="100%" height="100%">
       <defs>${def}</defs>
-      <g class="${motionClass}" style="transform-origin:${cx}px ${cy}px;">${shapeSvg}</g>
+      <g class="${motionClass}" style="transform-origin:${cx}px ${cy}px;${motionStyle}">${shapeSvg}</g>
     </svg>
   `;
 }
 
 /* ---------------------------------------------------------------
    Property-option icons: each button shows the *effect* of applying
-   that specific option to the current trial's shape, against a plain,
+   that specific option to the current trial's shape, against a black,
    neutral baseline -- so the icon itself demonstrates the change
    (a genuinely bigger/smaller shape, a genuinely thicker/thinner
-   outline, etc.) rather than symbolizing it with an abstract arrow.
+   outline) rather than symbolizing it with an abstract arrow. Every
+   icon is drawn at the shape's "large" size fraction (except the Size
+   option itself, which shows its own true small/large scale), so
+   every icon reads at a consistent, large, clear scale.
 ---------------------------------------------------------------- */
-const ICON_VB = 96;
-const ICON_CENTER = 48;
-const ICON_BASE_RADIUS = 20;
+const ICON_VB = 120;
+const ICON_CENTER = 60;
 
 function iconSvgFor(shape, catKey, optId, context){
   const spec = {
     shape,
-    size:'iconBaseline', texture:null,
+    size:'large', texture:null,
     color: (catKey === 'color' ? null : 'black'),
     lineWidth:null, motion:null
   };
   spec[catKey] = optId;
   const strokeMultiplier = (catKey === 'color') ? 2 : 1;
-  const { def, shapeSvg, motionClass } = specToSvg(spec, ICON_CENTER, ICON_CENTER, ICON_BASE_RADIUS, context, strokeMultiplier);
+  const { def, shapeSvg, motionClass, motionStyle } = specToSvg(spec, ICON_CENTER, ICON_CENTER, context, strokeMultiplier);
   return `<svg viewBox="0 0 ${ICON_VB} ${ICON_VB}">
     <defs>${def}</defs>
-    <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;">${shapeSvg}</g>
+    <g class="${motionClass}" style="transform-origin:${ICON_CENTER}px ${ICON_CENTER}px;${motionStyle}">${shapeSvg}</g>
   </svg>`;
 }
 
@@ -459,7 +528,7 @@ function previewIconSvg(catKey, optId){
    SHAPES.length shapes) is generated once, up front, as a fixed list
    -- not sampled randomly trial to trial. Each user gets their own
    shuffled ORDER over this same fixed set, so across a full pass
-   every user sees all 160 stimuli exactly once each, just in a
+   every user sees all stimuli exactly once each, just in a
    different (randomized) sequence.
 ---------------------------------------------------------------- */
 function generateStimulusDatabase(){
@@ -506,9 +575,16 @@ let state = {
   target: null,
   build: { size:null, texture:null, color:null, lineWidth:null, motion:null },
   trialCount: 0,
-  slotOrder: [],      // slotOrder[i] = category key placed in pentagon position i, re-shuffled every trial
-  optionOrder: {}      // optionOrder[catKey] = shuffled option-id order, re-shuffled every trial
+  slotOrder: [],   // slotOrder[i] = category key placed in pentagon position i, re-shuffled every trial
+  optionOrder: {}  // optionOrder[catKey] = shuffled option-id order, re-shuffled every trial
 };
+
+let revealTimeouts = [];
+
+function clearRevealTimeouts(){
+  revealTimeouts.forEach(id => clearTimeout(id));
+  revealTimeouts = [];
+}
 
 // Unique target combinations seen so far (shape + all 5 property values),
 // used to show real coverage progress out of TOTAL_POSSIBLE_TRIALS.
@@ -516,6 +592,20 @@ const seenTrials = new Set();
 function trialKey(target){
   return [target.shape, ...CATEGORIES.map(cat => target[cat.key])].join('|');
 }
+
+/* ---------------------------------------------------------------
+   Reveal sequence at the start of every trial. The boxes and pentagon
+   slots themselves never move or resize between trials -- only what's
+   drawn inside them changes, and it changes in stages rather than all
+   at once:
+     1. everything clears (blank build box, blank target square,
+        blank prop slots)
+     2. after a delay, the target image appears, anchored center
+     3. after another delay, the plain (unbuilt) outline appears
+     4. after another delay, every option for every property appears
+        together, all at once
+---------------------------------------------------------------- */
+const REVEAL_DELAY_MS = 750;
 
 function newTrial(){
   if(stimulusIndex >= stimulusOrder.length){
@@ -530,7 +620,7 @@ function newTrial(){
   state.trialCount += 1;
   seenTrials.add(trialKey(target));
 
-  // which pentagon position each property lands in, re-randomized every trial
+  // which pentagon vertex each property lands in, re-randomized every trial
   state.slotOrder = shuffle(CATEGORIES.map(c=>c.key));
   // order of the two options within each property, re-randomized every trial
   state.optionOrder = {};
@@ -538,10 +628,43 @@ function newTrial(){
     state.optionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
   });
 
-  render();
+  clearRevealTimeouts();
+
+  // Stage 1 (immediate): the shapes inside every box disappear, but the
+  // boxes themselves -- Target, Yours, and every property option -- are
+  // drawn now and stay put for the rest of the trial. Property boxes are
+  // drawn as empty shells (still correctly wired to their eventual
+  // option) so their icon + label can fill in later without the box
+  // itself appearing or moving.
+  document.getElementById('shapeBox').innerHTML = '';
+  document.getElementById('targetFloat').innerHTML = '';
+  renderPropertyShells();
+  updateStats();
+  updateSubmitState();
+
+  // Stage 2: the target image appears, anchored dead-center.
+  revealTimeouts.push(setTimeout(()=>{
+    showTargetImage();
+  }, REVEAL_DELAY_MS));
+
+  // Stage 3: the base (unbuilt) outline appears.
+  revealTimeouts.push(setTimeout(()=>{
+    renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
+  }, REVEAL_DELAY_MS * 2));
+
+  // Stage 4: every option box's icon + label fill in together, all at once.
+  revealTimeouts.push(setTimeout(()=>{
+    renderProperties();
+    updateSubmitState();
+  }, REVEAL_DELAY_MS * 3));
+}
+
+function allPropertiesSelected(){
+  return CATEGORIES.every(cat => state.build[cat.key] !== null);
 }
 
 function submitTrial(){
+  if(!allPropertiesSelected()) return; // guard; the button is disabled too
   newTrial();
 }
 
@@ -551,16 +674,24 @@ function selectOption(catKey, optId){
 }
 
 /* ---------------------------------------------------------------
-   Rendering. The pentagon's five vertex positions and the box
-   sizes/positions are fixed in the markup/CSS above and never move --
-   only which property sits in which vertex, and which option comes
-   first within a property, are reshuffled by newTrial() each round.
+   Rendering for in-trial changes (picking/unpicking an option). The
+   pentagon's five vertex positions and the box sizes/positions are
+   fixed in the markup/CSS and never move -- only what's drawn inside
+   them changes, and it changes instantly here (the staged reveal only
+   happens once, at the start of a trial -- see newTrial()). The
+   target image itself is NOT redrawn here -- see showTargetImage's
+   call site in newTrial().
 ---------------------------------------------------------------- */
 function render(){
-  renderInto(document.getElementById('targetBox'), state.target, 200, 100, 100, BASE_RADIUS, 'target');
-  renderInto(document.getElementById('board'), { shape: state.target.shape, ...state.build }, 200, 100, 100, BASE_RADIUS, 'board');
+  renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
   renderProperties();
   updateStats();
+  updateSubmitState();
+}
+
+function updateSubmitState(){
+  // subject must choose an option for every property before advancing
+  document.getElementById('submitBtn').disabled = !allPropertiesSelected();
 }
 
 function renderProperties(){
@@ -571,52 +702,94 @@ function renderProperties(){
     const opts = order.map(optId=>{
       const opt = cat.options.find(o=>o.id === optId);
       const selected = state.build[catKey] === optId;
-      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="selectOption('${catKey}','${optId}')">${previewIconSvg(catKey, optId)}</button>`;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="selectOption('${catKey}','${optId}')">${previewIconSvg(catKey, optId)}</button><div class="opt-label">${opt.label}</div></div>`;
     }).join('');
-    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
+  });
+}
+
+// Draws just the empty option boxes -- same positions, same count, same
+// click targets -- with no icon or label inside yet. Used at the very
+// start of a trial so the boxes themselves are present the whole time;
+// renderProperties() later fills in each box's icon + label on the delay.
+function renderPropertyShells(){
+  state.slotOrder.forEach((catKey, i)=>{
+    const el = document.getElementById('prop-slot-' + i);
+    const order = state.optionOrder[catKey];
+    const opts = order.map(optId=>{
+      const selected = state.build[catKey] === optId;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="selectOption('${catKey}','${optId}')"></button><div class="opt-label"></div></div>`;
+    }).join('');
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
   });
 }
 
 function updateStats(){
   document.getElementById('statsText').textContent =
-    `Trial ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS}`;
+    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
 }
 
 /* ---------------------------------------------------------------
-   Screen 1: task explanation. Holds for roughly the average time it
-   takes to silently read the instructions (~200 words per minute)
-   before the Proceed button becomes available, so it can't be
-   skipped instantly.
+   Target image: the target's actual rendered image (its real size,
+   texture, color, line-width, and motion -- the same rendering used
+   everywhere else, not a symbol or label for it) sits anchored,
+   stationary, dead-center in its own square below/left of the build
+   box, redrawn fresh every trial. No intro scene, no memorization
+   step: this square is simply always visible, right alongside the
+   build box. This is a direct swap for the word-square idea -- same
+   box, same size -- just showing one fixed rendered shape instead of
+   five drifting word pills, since there's now an image to show
+   instead of adjectives to describe it with.
 ---------------------------------------------------------------- */
-const TASK_INSTRUCTIONS_TEXT = "Each trial shows a Target shape at the top of the pentagon, with its size, texture, color, line width, and motion set at random. Use the property options arranged around the boxes to recreate it in the Yours box below: choose the matching option for each of the five properties. Once your build matches the target in every property, click Submit to lock it in and move to the next trial.";
-
-function estimateReadingMs(text){
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const AVERAGE_READING_WPM = 200;
-  const ms = (words / AVERAGE_READING_WPM) * 60000;
-  return Math.max(3000, Math.round(ms));
+// Renders the target at its own true footprint (tightly cropped around
+// the shape + its outline ring, at the SAME size fraction as it would
+// use in the build box -- domainHalf 100, exactly like specToSvg uses
+// for every other box) so "large" targets are genuinely large and
+// "small" targets are genuinely small within the fixed 200x200 square.
+function targetFootprintSvg(spec){
+  const domainHalf = 100;
+  const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
+  const strokeColor = colorHex(spec.color);
+  const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100);
+  const outlineR = R + strokeWidth / 2;
+  const size = outlineR * 2;
+  const c = outlineR;
+  const fillInfo = textureFill(spec.texture, spec.color, 'targetimg');
+  const fillEl = shapeElement(spec.shape, c, c, R, `fill="${fillInfo.fill}" stroke="none"`);
+  const outlineEl = shapeElement(spec.shape, c, c, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
+  const motionClass = spec.motion ? ('m-' + spec.motion) : '';
+  const html = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block;">
+      <defs>${fillInfo.def}</defs>
+      <g class="${motionClass}" style="transform-origin:${c}px ${c}px;${motionStyle(spec.motion)}">${fillEl}${outlineEl}</g>
+    </svg>`;
+  return { html, size };
 }
 
-function showInstructions(){
-  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
-  const btn = document.getElementById('proceedBtn');
-  btn.style.visibility = 'hidden';
-  setTimeout(()=>{ btn.style.visibility = 'visible'; }, estimateReadingMs(TASK_INSTRUCTIONS_TEXT));
-}
+function showTargetImage(){
+  const zone = document.getElementById('targetFloat');
+  zone.innerHTML = '';
 
-function goToSandbox(){
-  document.getElementById('instructionsWrap').style.display = 'none';
-  document.getElementById('sandboxWrap').style.display = '';
+  const { html } = targetFootprintSvg(state.target);
+  const el = document.createElement('div');
+  el.className = 'tf-shape';
+  el.innerHTML = html;
+  zone.appendChild(el);
 }
 
 /* ---------------------------------------------------------------
-   Screen 2: sandbox. A free-play preview box surrounded by the same
-   pentagon of property controls used in the real task, unconnected
-   to any target -- purely so the user sees what every individual
-   option looks like before the real task's scoring begins. "Tried" =
-   clicked that specific option (10 total: 5 properties x 2 options
-   each). Continue unlocks only once all ten have been clicked.
+   Merged intro + sandbox screen. The instructions are simply shown
+   immediately (no reading-time gate / no Proceed button) alongside
+   the building space -- a free-play preview box, using the same
+   shape outline and the same size as the box used in the real task
+   -- and the sandbox controls underneath are live right away.
+   "Tried" = clicked that specific option (10 total: 5 properties x 2
+   options each). Continue unlocks only once all ten have been
+   clicked. The slot order (which property sits where) and each
+   property's option order are randomized once, the same way the
+   real task randomizes them every trial.
 ---------------------------------------------------------------- */
+const TASK_INSTRUCTIONS_TEXT = "In each trial, an image of the hidden target sits in the square to the left, showing its actual size, texture, color, line width, and motion. Use the property options arranged around the build box to recreate the target: choose the matching option for each of the five properties. Once your build matches the target in every property, click Submit to lock it in and move to the next trial.";
+
 let sandboxState = {
   shape: pickRandom(SHAPES),
   build: { size:null, texture:null, color:null, lineWidth:null, motion:null }
@@ -624,17 +797,28 @@ let sandboxState = {
 const triedOptions = new Set();
 const TOTAL_SANDBOX_OPTIONS = CATEGORIES.reduce((n, cat) => n + cat.options.length, 0);
 
-function renderSandbox(){
-  renderInto(document.getElementById('sandboxBox'), { shape: sandboxState.shape, ...sandboxState.build }, 200, 100, 100, BASE_RADIUS, 'sandbox');
+// randomized once: which property lands in which slot, and the
+// left-to-right order of each property's own options
+let sandboxSlotOrder = shuffle(CATEGORIES.map(c=>c.key));
+let sandboxOptionOrder = {};
+CATEGORIES.forEach(cat=>{
+  sandboxOptionOrder[cat.key] = shuffle(cat.options.map(o=>o.id));
+});
 
-  CATEGORIES.forEach((cat, i)=>{
+function renderSandbox(){
+  renderInto(document.getElementById('sandboxBox'), { shape: sandboxState.shape, ...sandboxState.build }, 200, 100, 100, 'sandbox');
+
+  sandboxSlotOrder.forEach((catKey, i)=>{
+    const cat = CATEGORIES.find(c=>c.key === catKey);
     const el = document.getElementById('sandbox-prop-slot-' + i);
-    const opts = cat.options.map(opt=>{
-      const selected = sandboxState.build[cat.key] === opt.id;
-      const ctx = 'sandbox_' + cat.key + '_' + opt.id;
-      return `<button class="opt${selected?' selected':''}" title="${opt.label}" onclick="sandboxSelect('${cat.key}','${opt.id}')">${iconSvgFor(sandboxState.shape, cat.key, opt.id, ctx)}</button>`;
+    const order = sandboxOptionOrder[catKey];
+    const opts = order.map(optId=>{
+      const opt = cat.options.find(o=>o.id === optId);
+      const selected = sandboxState.build[catKey] === optId;
+      const ctx = 'sandbox_' + catKey + '_' + optId;
+      return `<div class="opt-unit"><button class="opt${selected?' selected':''}" onclick="sandboxSelect('${catKey}','${optId}')">${iconSvgFor(sandboxState.shape, catKey, optId, ctx)}</button><div class="opt-label">${opt.label}</div></div>`;
     }).join('');
-    el.innerHTML = `<div class="prop-label">${cat.label}</div><div class="prop-options">${opts}</div>`;
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
   });
 
   updateSandboxProgress();
@@ -653,11 +837,12 @@ function updateSandboxProgress(){
 }
 
 function initSandbox(){
+  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
   renderSandbox();
 }
 
 /* ---------------------------------------------------------------
-   Screen 3: hand off to the task, unchanged from here on.
+   Hand off to the task, unchanged from here on.
 ---------------------------------------------------------------- */
 function goToTask(){
   document.getElementById('sandboxWrap').style.display = 'none';
@@ -666,7 +851,6 @@ function goToTask(){
 }
 
 initSandbox();
-showInstructions();
 </script>
 </body>
 </html>
