@@ -366,7 +366,6 @@
 <!-- Screen 4: the task itself, unchanged -->
 <div class="wrap" id="taskWrap" style="display:none;">
   <div class="top">
-    <div class="prompt-label">Match this shape:</div>
     <div class="progress-wrap" id="statsText">
       <div class="progress-label" id="progressLabel"></div>
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
@@ -808,8 +807,6 @@ function renderPropertyShells(){
 
 function updateStats(){
   const pct = TOTAL_POSSIBLE_TRIALS > 0 ? Math.min(100, (seenTrials.size / TOTAL_POSSIBLE_TRIALS) * 100) : 0;
-  document.getElementById('progressLabel').textContent =
-    `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
   document.getElementById('progressFill').style.width = pct + '%';
 }
 
