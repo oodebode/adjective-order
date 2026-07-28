@@ -32,11 +32,31 @@
     line-height:1.4;
     color:#222;
   }
-  .stats{
+  .progress-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:5px;
+  }
+  .progress-label{
     font-size:12px;
     color:var(--gray-label);
     text-align:right;
     white-space:nowrap;
+  }
+  .progress-track{
+    width:160px;
+    height:6px;
+    background:var(--gray-line);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;
+    width:0%;
+    background:#111;
+    border-radius:3px;
+    transition:width .3s ease;
   }
 
   .box-unit{
@@ -149,6 +169,11 @@
     -moz-user-select:none;
   }
 
+  .yours-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
   .board-actions{
     display:flex;
     justify-content:center;
@@ -247,21 +272,51 @@
   }
   .screen-title{ font-size:20px; margin:0 0 10px; }
   .screen-text{ font-size:15px; line-height:1.65; color:#333; margin:0; }
-  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; text-align:center; }
+  .sandbox-progress{ font-size:13px; color:var(--gray-label); margin-top:14px; text-align:left; }
   button.action:disabled{ opacity:.4; cursor:not-allowed; }
+  /* instruction-page Continue button sits directly under the text
+     block, left-aligned with it, rather than centered under the
+     whole two-column layout. */
+  .page-actions{ justify-content:flex-start; margin-top:16px; }
 </style>
 </head>
 <body>
 
-<!-- Merged intro + sandbox screen: instructions on the left, the building
-     space (same shape outline / same size as the box used in the real
-     task) on the right, no reading-time gate -- the sandbox controls
-     are simply available immediately underneath. -->
-<div class="wrap" id="sandboxWrap">
+<!-- Page 1: instructions text + the sandbox + the bare shape only --
+     no properties, no property boxes, no property labels. Just the
+     outline the subject will be building throughout the task. -->
+<div class="wrap" id="page1">
   <div class="intro-top">
     <div class="intro-left">
       <h2 class="screen-title">How this task works</h2>
-      <p class="screen-text" id="instructionsText"></p>
+      <p class="screen-text" id="page1Text"></p>
+      <div class="board-actions page-actions">
+        <button class="action submit" onclick="goToPage2()">Continue</button>
+      </div>
+    </div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon" id="page1PentagonWrap">
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="page1Box"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 2: adds the properties (live sandbox, same as before) and
+     additional explanation of what they do. -->
+<div class="wrap" id="page2" style="display:none;">
+  <div class="intro-top">
+    <div class="intro-left">
+      <h2 class="screen-title">Choosing properties</h2>
+      <p class="screen-text" id="page2Text"></p>
+      <div class="sandbox-progress" id="sandboxProgress">0 of 10 options tried</div>
+      <div class="board-actions page-actions">
+        <button class="action submit" id="sandboxContinueBtn" disabled onclick="goToPage3()">Continue</button>
+      </div>
     </div>
     <div class="intro-right">
       <div class="pentagon-wrap sandbox-pentagon" id="sandboxPentagonWrap">
@@ -280,49 +335,78 @@
       </div>
     </div>
   </div>
-
-  <div class="sandbox-progress" id="sandboxProgress">0 of 10 options tried</div>
-  <div class="board-actions">
-    <button class="action submit" id="sandboxContinueBtn" disabled onclick="goToTask()">Continue</button>
-  </div>
 </div>
 
-<!-- Screen 3: the task itself, unchanged -->
-<div class="wrap" id="taskWrap" style="display:none;">
-  <div class="top">
-    <div class="prompt-label">Match this shape:</div>
-    <div class="stats" id="statsText"></div>
-  </div>
-
+<!-- Page 3: an example target image, with a short note on why it
+     matters -- this is what every trial will ask them to match. -->
+<div class="wrap" id="page3" style="display:none;">
   <div class="intro-top">
-    <div class="intro-left task-image-col">
-      <div class="box-unit">
-        <div class="target-square" id="targetSquare">
-          <div class="target-float" id="targetFloat"></div>
-        </div>
-        <div class="box-caption">Target</div>
+    <div class="intro-left">
+      <h2 class="screen-title">Matching the target</h2>
+      <p class="screen-text" id="page3Text"></p>
+      <div class="board-actions page-actions">
+        <button class="action submit" onclick="goToTask()">Start task</button>
       </div>
     </div>
-    <div class="intro-right">
-      <div class="pentagon-wrap sandbox-pentagon" id="pentagonWrap">
-        <div class="pent-slot pent-0" id="prop-slot-0"></div>
-        <div class="pent-slot pent-1" id="prop-slot-1"></div>
-        <div class="pent-slot pent-2" id="prop-slot-2"></div>
-        <div class="pent-slot pent-3" id="prop-slot-3"></div>
-        <div class="pent-slot pent-4" id="prop-slot-4"></div>
-
+    <div class="intro-right task-image-col">
+      <div class="pentagon-wrap sandbox-pentagon" id="page3PentagonWrap">
         <div class="core-stack">
           <div class="box-unit">
-            <div class="box" id="shapeBox"></div>
-            <div class="box-caption">Yours</div>
+            <div class="target-square" id="page3TargetSquare">
+              <div class="target-float" id="page3TargetFloat"></div>
+            </div>
+            <div class="box-caption">Target</div>
           </div>
         </div>
       </div>
     </div>
   </div>
+</div>
 
-  <div class="board-actions">
-    <button class="action submit" id="submitBtn" onclick="submitTrial()">Submit</button>
+<!-- Screen 4: the task itself, unchanged -->
+<div class="wrap" id="taskWrap" style="display:none;">
+  <div class="top">
+    <div class="prompt-label">Match this shape:</div>
+    <div class="progress-wrap" id="statsText">
+      <div class="progress-label" id="progressLabel"></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="intro-top">
+    <div class="intro-left task-image-col">
+      <div class="pentagon-wrap sandbox-pentagon" id="targetPentagonWrap">
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="target-square" id="targetSquare">
+              <div class="target-float" id="targetFloat"></div>
+            </div>
+            <div class="box-caption">Target</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="intro-right">
+      <div class="yours-col">
+        <div class="pentagon-wrap sandbox-pentagon" id="pentagonWrap">
+          <div class="pent-slot pent-0" id="prop-slot-0"></div>
+          <div class="pent-slot pent-1" id="prop-slot-1"></div>
+          <div class="pent-slot pent-2" id="prop-slot-2"></div>
+          <div class="pent-slot pent-3" id="prop-slot-3"></div>
+          <div class="pent-slot pent-4" id="prop-slot-4"></div>
+
+          <div class="core-stack">
+            <div class="box-unit">
+              <div class="box" id="shapeBox"></div>
+              <div class="box-caption">Yours</div>
+            </div>
+          </div>
+        </div>
+        <div class="board-actions">
+          <button class="action submit" id="submitBtn" onclick="submitTrial()">Next</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -336,14 +420,14 @@ const SHAPES = ['triangle','oval','square'];
 const CATEGORIES = [
   { key:'size',      label:'Size',       options:[ {id:'small', label:'Small'}, {id:'large', label:'Large'} ] },
   { key:'texture',   label:'Texture',    options:[ {id:'striped', label:'Striped'}, {id:'dotted', label:'Dotted'} ] },
-  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple'}, {id:'yellow', label:'Yellow'} ] },
+  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple'}, {id:'yellow', label:'Orange'} ] },
   { key:'lineWidth', label:'Line Width', options:[ {id:'thick', label:'Thick'}, {id:'thin', label:'Thin'} ] },
   { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking'}, {id:'rotate', label:'Spinning'} ] }
 ];
 
 function colorHex(id){
   if(id === 'purple') return '#8E24AA';
-  if(id === 'yellow') return '#F5C518';
+  if(id === 'yellow') return '#F57C00';
   if(id === 'black')  return '#111111';
   return '#9a9a9a'; // neutral / not-yet-chosen (live build only, never an icon)
 }
@@ -599,13 +683,13 @@ function trialKey(target){
    drawn inside them changes, and it changes in stages rather than all
    at once:
      1. everything clears (blank build box, blank target square,
-        blank prop slots)
-     2. after a delay, the target image appears, anchored center
-     3. after another delay, the plain (unbuilt) outline appears
-     4. after another delay, every option for every property appears
-        together, all at once
+        blank prop slots) and stays blank for 1 second
+     2. the target image appears alone, anchored center, and stays
+        alone for 1 second
+     3. everything else -- the plain (unbuilt) base outline AND every
+        option for every property -- appears together, all at once
 ---------------------------------------------------------------- */
-const REVEAL_DELAY_MS = 750;
+const REVEAL_DELAY_MS = 1000;
 
 function newTrial(){
   if(stimulusIndex >= stimulusOrder.length){
@@ -642,21 +726,19 @@ function newTrial(){
   updateStats();
   updateSubmitState();
 
-  // Stage 2: the target image appears, anchored dead-center.
+  // Stage 2: the target image appears alone, anchored dead-center.
   revealTimeouts.push(setTimeout(()=>{
     showTargetImage();
   }, REVEAL_DELAY_MS));
 
-  // Stage 3: the base (unbuilt) outline appears.
+  // Stage 3: everything else appears together, all at once -- the base
+  // (unbuilt) outline AND every option box's icon + label fill in at
+  // the same moment.
   revealTimeouts.push(setTimeout(()=>{
     renderInto(document.getElementById('shapeBox'), { shape: state.target.shape, ...state.build }, 200, 100, 100, 'build');
-  }, REVEAL_DELAY_MS * 2));
-
-  // Stage 4: every option box's icon + label fill in together, all at once.
-  revealTimeouts.push(setTimeout(()=>{
     renderProperties();
     updateSubmitState();
-  }, REVEAL_DELAY_MS * 3));
+  }, REVEAL_DELAY_MS * 2));
 }
 
 function allPropertiesSelected(){
@@ -725,8 +807,10 @@ function renderPropertyShells(){
 }
 
 function updateStats(){
-  document.getElementById('statsText').textContent =
+  const pct = TOTAL_POSSIBLE_TRIALS > 0 ? Math.min(100, (seenTrials.size / TOTAL_POSSIBLE_TRIALS) * 100) : 0;
+  document.getElementById('progressLabel').textContent =
     `Trial ${state.trialCount} · ${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} unique combinations seen`;
+  document.getElementById('progressFill').style.width = pct + '%';
 }
 
 /* ---------------------------------------------------------------
@@ -788,7 +872,9 @@ function showTargetImage(){
    property's option order are randomized once, the same way the
    real task randomizes them every trial.
 ---------------------------------------------------------------- */
-const TASK_INSTRUCTIONS_TEXT = "Your job is to craft an image from the basic outline provided on the right. You will have complete control over how the resulting shape looks based on the properties we give you. Your goal is to mimic the shape shown in the box which will appear to the left of shape. Once your build matches everything the floating words describe, click Submit to lock it in and move to the next trial.";
+const PAGE1_TEXT = "Your job is to craft an image starting from a basic outline shape, shown here on the right. This is the same shape and the same box you'll be building in throughout the task. Next, you'll see the properties you can use to change how it looks.";
+const PAGE2_TEXT = "Each shape has five properties: size, texture, color, line width, and motion. Every property offers two options. Click any option below to see how it changes your shape -- try every option at least once to continue.";
+const PAGE3_TEXT = "In every trial, a target image like this one will appear. It shows exactly what your build needs to look like -- your goal is to match it as closely as possible across all five properties before you submit.";
 
 let sandboxState = {
   shape: pickRandom(SHAPES),
@@ -836,21 +922,74 @@ function updateSandboxProgress(){
   document.getElementById('sandboxContinueBtn').disabled = n < TOTAL_SANDBOX_OPTIONS;
 }
 
-function initSandbox(){
-  document.getElementById('instructionsText').textContent = TASK_INSTRUCTIONS_TEXT;
+/* ---------------------------------------------------------------
+   Page 1: text + the sandbox + the bare shape only. No properties,
+   no property boxes, no labels -- just the same outline/box the
+   subject will build in for the rest of the task, rendered with
+   every property still null.
+---------------------------------------------------------------- */
+function initPage1(){
+  document.getElementById('page1Text').textContent = PAGE1_TEXT;
+  renderInto(
+    document.getElementById('page1Box'),
+    { shape: sandboxState.shape, size:null, texture:null, color:null, lineWidth:null, motion:null },
+    200, 100, 100, 'page1'
+  );
+}
+
+/* ---------------------------------------------------------------
+   Page 2: adds the properties -- the same live pentagon sandbox as
+   before, with additional explanation of what the properties are
+   and how to try them.
+---------------------------------------------------------------- */
+function initPage2(){
+  document.getElementById('page2Text').textContent = PAGE2_TEXT;
   renderSandbox();
 }
+
+/* ---------------------------------------------------------------
+   Page 3: an example target image (a fixed, fully-specified demo
+   shape -- not tied to the real trial sequence) with a short note
+   on why it matters.
+---------------------------------------------------------------- */
+function initPage3(){
+  document.getElementById('page3Text').textContent = PAGE3_TEXT;
+  const demoSpec = { shape: pickRandom(SHAPES), size:'large', texture:'striped', color:'purple', lineWidth:'thick', motion:'rotate' };
+  const { html } = targetFootprintSvg(demoSpec);
+  const zone = document.getElementById('page3TargetFloat');
+  zone.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'tf-shape';
+  el.innerHTML = html;
+  zone.appendChild(el);
+}
+
+/* ---------------------------------------------------------------
+   Page navigation. Each instruction page is built once, up front,
+   so switching between them is just a display toggle -- nothing
+   re-renders or resets.
+---------------------------------------------------------------- */
+function showPage(id){
+  ['page1','page2','page3','taskWrap'].forEach(p=>{
+    document.getElementById(p).style.display = (p === id) ? '' : 'none';
+  });
+}
+
+function goToPage2(){ showPage('page2'); }
+function goToPage3(){ showPage('page3'); }
 
 /* ---------------------------------------------------------------
    Hand off to the task, unchanged from here on.
 ---------------------------------------------------------------- */
 function goToTask(){
-  document.getElementById('sandboxWrap').style.display = 'none';
-  document.getElementById('taskWrap').style.display = '';
+  showPage('taskWrap');
   newTrial();
 }
 
-initSandbox();
+initPage1();
+initPage2();
+initPage3();
+showPage('page1');
 </script>
 </body>
 </html>
