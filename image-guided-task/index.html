@@ -278,6 +278,37 @@
      block, left-aligned with it, rather than centered under the
      whole two-column layout. */
   .page-actions{ justify-content:flex-start; margin-top:16px; }
+
+  /* task screen: the "Yours" column is taller than the "Target" column
+     because of the Next button sitting below its box, so the shared
+     .intro-top's align-items:center (used to vertically center the
+     instruction pages' text/image pairs) would otherwise pull the two
+     boxes out of line with each other. Top-align just this screen's
+     columns instead, so Target and Yours -- both identically-sized
+     pentagon-wraps -- sit on the same horizontal axis regardless of
+     what's below them. */
+  #taskWrap .intro-top{ align-items:flex-start; flex-wrap:nowrap; }
+  /* .intro-left's max-width:220px is sized for the instruction pages'
+     narrow text column, which is too narrow here -- let it size to
+     its own (now-narrow, see below) content instead. */
+  #taskWrap .intro-left{ flex:0 0 auto; max-width:none; }
+  /* The Target pentagon-wrap only ever holds a plain centered box --
+     no property slots surround it -- so unlike the Yours column it
+     doesn't need the full 640px pentagon width. Shrinking it to just
+     fit its box reclaims the large empty margin that was pushing
+     Yours and the property options off the right edge of the screen.
+     Height is kept equal to the Yours pentagon-wrap's fixed 600px (its
+     width is always capped at 640, i.e. height always 600, above the
+     780px breakpoint where the pentagon layout applies at all) so the
+     box -- still centered via the same .core-stack absolute-centering
+     -- lands on the same row as Yours despite the narrower column. */
+  @media (min-width:781px){
+    #targetPentagonWrap{
+      width:240px;
+      aspect-ratio:auto;
+      height:600px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -808,6 +839,7 @@ function renderPropertyShells(){
 function updateStats(){
   const pct = TOTAL_POSSIBLE_TRIALS > 0 ? Math.min(100, (seenTrials.size / TOTAL_POSSIBLE_TRIALS) * 100) : 0;
   document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} combinations seen`;
 }
 
 /* ---------------------------------------------------------------
@@ -832,9 +864,17 @@ function targetFootprintSvg(spec){
   const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
   const strokeColor = colorHex(spec.color);
   const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100);
+  // outlineR is where the outline PATH itself sits (its centerline).
+  // Because SVG strokes are centered on their path, the actual visible
+  // edge extends a further strokeWidth/2 beyond outlineR -- so the crop
+  // box has to be sized to R + strokeWidth (the FULL stroke), not just
+  // R + strokeWidth/2, or thick strokes on large shapes get clipped by
+  // the target-square's overflow:hidden. This matches how the "Yours"
+  // box's own domain (100) is sized to safely contain R + strokeWidth.
   const outlineR = R + strokeWidth / 2;
-  const size = outlineR * 2;
-  const c = outlineR;
+  const halfExtent = R + strokeWidth;
+  const size = halfExtent * 2;
+  const c = halfExtent;
   const fillInfo = textureFill(spec.texture, spec.color, 'targetimg');
   const fillEl = shapeElement(spec.shape, c, c, R, `fill="${fillInfo.fill}" stroke="none"`);
   const outlineEl = shapeElement(spec.shape, c, c, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
