@@ -42,7 +42,7 @@
   }
   .box svg{overflow:visible;}
   /* fixed across every trial -- only the shape drawn inside changes. */
-  #shapeBox, #sandboxBox, #shapeOnlyBox{ width:200px; height:200px; }
+  #shapeBox, #sandboxBox, #shapeOnlyBox, #instr3ShapeBox{ width:200px; height:200px; }
 
   /* the square where the target's descriptive words float continuously
      -- always visible, no transition or separate "question" step.
@@ -256,18 +256,70 @@
     justify-content:center;
   }
 
-  /* ---- progress bar (task screen) ---- */
-  .progress-wrap{ margin:4px 0 16px; }
-  .progress-label{ font-size:13px; font-weight:600; color:var(--gray-label); margin-bottom:5px; }
-  .progress-track{ width:100%; height:8px; background:var(--gray-line); border-radius:4px; overflow:hidden; }
+  /* ---- progress bar (task screen) -- small, sits above the target
+     box only, so it never spans the whole task width. ---- */
+  .progress-wrap{ width:var(--word-size); margin:0 0 8px; }
+  .progress-label{ font-size:10px; font-weight:600; color:var(--gray-label); margin-bottom:3px; }
+  .progress-track{ width:100%; height:5px; background:var(--gray-line); border-radius:3px; overflow:hidden; }
   .progress-fill{ height:100%; background:#111; width:0%; transition:width .3s ease; }
+
+  /* ---- instruction pages: full-width text sits above the visual
+     row, and the visual row itself reuses the exact same
+     target-col + pentagon layout as the real task, so nothing
+     shifts position as the participant moves from page to page. ---- */
+  .instr-header{ max-width:820px; margin:0 auto 18px; text-align:left; }
+  .instr-header .screen-title{ margin:0 0 6px; }
+  .instr-header .screen-text{ margin:0; }
+  /* page 3 is the only instruction page where text sits above the
+     visual instead of beside it -- pulled tighter on all sides so
+     the header + box + button still fit on one screen. */
+  .instr-header-compact{ margin:8px auto 6px; }
+  .compact-pentagon{ width:min(80vw, 520px); margin-top:0; }
+
+  .build-caption{
+    font-size:13px;
+    font-weight:700;
+    color:#333;
+    margin-bottom:2px;
+    text-align:center;
+  }
+
+  /* ---- agree / light-mode page: centered on the full viewport ---- */
+  #instr0{
+    min-height:calc(100vh - 32px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .agree-box{
+    max-width:520px;
+    margin:0 auto;
+    text-align:center;
+  }
+  .agree-box .screen-title{ margin:0 0 10px; }
+  .agree-box .screen-text{ margin:0 0 10px; }
+  .agree-box .board-actions{ justify-content:center; }
 </style>
 </head>
 <body>
 
+<!-- Page 0: shown before any instructions. Asks the participant to set
+     their system display to light mode, and requires an explicit
+     "Agree" click before anything else is shown. -->
+<div class="wrap" id="instr0">
+  <div class="agree-box">
+    <h2 class="screen-title">Before you begin</h2>
+    <p class="screen-text">This task is designed to be viewed in <strong>light mode</strong>. Please take a moment to set your device's display settings to light mode before continuing -- some shapes and colors may be hard to see otherwise.</p>
+    <p class="screen-text">By clicking Agree below, you confirm that your display is set to light mode and that you're ready to begin.</p>
+    <div class="board-actions">
+      <button class="action submit" onclick="goToPage(1)">Agree</button>
+    </div>
+  </div>
+</div>
+
 <!-- Instruction page 1: text + the sandbox area showing only the plain
      shape outline -- no properties, no property boxes, no labels. -->
-<div class="wrap" id="instr1">
+<div class="wrap" id="instr1" style="display:none;">
   <div class="intro-top">
     <div class="intro-left">
       <h2 class="screen-title">How this task works</h2>
@@ -318,41 +370,53 @@
 <!-- Instruction page 3: shows an appropriate target box from the task
      (the floating-words box), with a short note on why it matters. -->
 <div class="wrap" id="instr3" style="display:none;">
-  <div class="intro-top">
-    <div class="intro-left">
-      <h2 class="screen-title">What you'll be matching</h2>
-      <p class="screen-text" id="instr3Text"></p>
-      <div class="board-actions">
-        <button class="action submit" onclick="goToTask()">Start task</button>
-      </div>
-    </div>
-    <div class="intro-right">
-      <div class="static-frame">
-        <div class="box-unit">
-          <div class="word-square" id="sampleTargetSquare">
-            <div class="word-float" id="sampleTargetFloat"></div>
-          </div>
-          <div class="box-caption">Target</div>
+  <div class="instr-header instr-header-compact">
+    <h2 class="screen-title">What you'll be matching</h2>
+    <p class="screen-text" id="instr3Text"></p>
+  </div>
+  <div class="intro-top" style="justify-content:center;align-items:center;">
+    <div class="intro-left task-target-col">
+      <div class="box-unit">
+        <div class="build-caption">Build a...</div>
+        <div class="word-square" id="sampleTargetSquare">
+          <div class="word-float" id="sampleTargetFloat"></div>
         </div>
       </div>
     </div>
+    <div class="intro-right">
+      <div class="pentagon-wrap sandbox-pentagon compact-pentagon">
+        <div class="pent-slot pent-0" id="instr3-prop-slot-0"></div>
+        <div class="pent-slot pent-1" id="instr3-prop-slot-1"></div>
+        <div class="pent-slot pent-2" id="instr3-prop-slot-2"></div>
+        <div class="pent-slot pent-3" id="instr3-prop-slot-3"></div>
+        <div class="pent-slot pent-4" id="instr3-prop-slot-4"></div>
+        <div class="core-stack">
+          <div class="box-unit">
+            <div class="box" id="instr3ShapeBox"></div>
+            <div class="box-caption">Yours</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="board-actions">
+    <button class="action submit" onclick="goToTask()">Start task</button>
   </div>
 </div>
 
 <!-- Screen 4: the task itself -->
 <div class="wrap" id="taskWrap" style="display:none;">
-  <div class="progress-wrap">
-    <div class="progress-label">Progress</div>
-    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-  </div>
-
   <div class="intro-top" style="justify-content:center;align-items:center;">
     <div class="intro-left task-target-col">
+      <div class="progress-wrap">
+        <div class="progress-label">Progress</div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
       <div class="box-unit">
+        <div class="build-caption">Build a...</div>
         <div class="word-square" id="wordSquare">
           <div class="word-float" id="wordFloat"></div>
         </div>
-        <div class="box-caption">Target</div>
       </div>
     </div>
     <div class="intro-right">
@@ -390,14 +454,14 @@ const SHAPES = ['triangle','oval','square'];
 const CATEGORIES = [
   { key:'size',      label:'Size',       options:[ {id:'small', label:'Small', word:'small'}, {id:'large', label:'Large', word:'large'} ] },
   { key:'texture',   label:'Texture',    options:[ {id:'striped', label:'Striped', word:'striped'}, {id:'dotted', label:'Dotted', word:'dotted'} ] },
-  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple', word:'purple'}, {id:'orange', label:'Orange', word:'orange'} ] },
+  { key:'color',     label:'Color',      options:[ {id:'purple', label:'Purple', word:'purple'}, {id:'yellow', label:'Yellow', word:'yellow'} ] },
   { key:'lineWidth', label:'Line Width', options:[ {id:'thick', label:'Thick', word:'thick'}, {id:'thin', label:'Thin', word:'thin'} ] },
   { key:'motion',    label:'Motion',     options:[ {id:'shake', label:'Shaking', word:'shaking'}, {id:'rotate', label:'Spinning', word:'spinning'} ] }
 ];
 
 function colorHex(id){
   if(id === 'purple') return '#8E24AA';
-  if(id === 'orange') return '#FB8C00';
+  if(id === 'yellow') return '#CC9A06';
   if(id === 'black')  return '#111111';
   return '#9a9a9a'; // neutral / not-yet-chosen (live build only, never an icon)
 }
@@ -614,7 +678,7 @@ function trialKey(target){
         option -- appears together, all at once
 ---------------------------------------------------------------- */
 const BLANK_MS = 1000;
-const TARGET_ONLY_MS = 1000;
+const TARGET_ONLY_MS = 2000;
 
 function newTrial(){
   if(stimulusIndex >= stimulusOrder.length){
@@ -670,8 +734,16 @@ function allPropertiesSelected(){
   return CATEGORIES.every(cat => state.build[cat.key] !== null);
 }
 
+// The build only counts as "done" once it exactly matches the target on
+// every property -- this is what gates the Next button. Any change away
+// from a correct build (even filling in a wrong option) re-disables it,
+// since updateNextState() re-runs this check after every selection.
+function buildMatchesTarget(){
+  return CATEGORIES.every(cat => state.build[cat.key] !== null && state.build[cat.key] === state.target[cat.key]);
+}
+
 function submitTrial(){
-  if(!allPropertiesSelected()) return; // guard; the button is disabled too
+  if(!buildMatchesTarget()) return; // guard; the button is disabled too
   newTrial();
 }
 
@@ -688,7 +760,7 @@ function render(){
 }
 
 function updateNextState(){
-  document.getElementById('nextBtn').disabled = !allPropertiesSelected();
+  document.getElementById('nextBtn').disabled = !buildMatchesTarget();
 }
 
 function renderProperties(){
@@ -891,10 +963,21 @@ function updateSandboxProgress(){
 
 /* ---------------------------------------------------------------
    Page 3: a sample target box (the same floating-words box used in
-   the task) so the participant knows what to expect.
+   the task), and a "Yours" box + property pentagon that show the
+   *correct* build for that exact sample -- so what's demonstrated
+   here is always consistent with (and relevant to) the words the
+   participant is reading, not whatever was left over from the page 2
+   sandbox.
 ---------------------------------------------------------------- */
+let instr3Sample = null;
+
+function getInstr3Sample(){
+  if(!instr3Sample) instr3Sample = pickRandom(STIMULUS_DB);
+  return instr3Sample;
+}
+
 function renderSampleTarget(){
-  const sample = pickRandom(STIMULUS_DB);
+  const sample = getInstr3Sample();
   const words = CATEGORIES.map(cat=>{
     const opt = cat.options.find(o=>o.id === sample[cat.key]);
     return opt.word;
@@ -902,16 +985,40 @@ function renderSampleTarget(){
   startWordFloatIn('sampleTargetFloat', words);
 }
 
+function renderInstr3Preview(){
+  const sample = getInstr3Sample();
+  // base/default shape -- no properties applied yet, matching page 1's
+  // plain outline, since the participant hasn't built anything here.
+  renderInto(document.getElementById('instr3ShapeBox'), { shape: sample.shape, size:null, texture:null, color:null, lineWidth:null, motion:null }, 200, 100, 100, 'instr3');
+
+  sandboxSlotOrder.forEach((catKey, i)=>{
+    const cat = CATEGORIES.find(c=>c.key === catKey);
+    const el = document.getElementById('instr3-prop-slot-' + i);
+    const order = sandboxOptionOrder[catKey];
+    const opts = order.map(optId=>{
+      const opt = cat.options.find(o=>o.id === optId);
+      // nothing selected here -- these are just the available options,
+      // not a claim about which one is correct.
+      const ctx = 'instr3_' + catKey + '_' + optId;
+      return `<div class="opt-unit"><div class="opt">${iconSvgFor(sample.shape, catKey, optId, ctx)}</div><div class="opt-label">${opt.label}</div></div>`;
+    }).join('');
+    el.innerHTML = `<div class="prop-options">${opts}</div>`;
+  });
+}
+
 /* ---------------------------------------------------------------
    Page navigation.
 ---------------------------------------------------------------- */
 function goToPage(n){
+  document.getElementById('instr0').style.display = n===0 ? '' : 'none';
   document.getElementById('instr1').style.display = n===1 ? '' : 'none';
   document.getElementById('instr2').style.display = n===2 ? '' : 'none';
   document.getElementById('instr3').style.display = n===3 ? '' : 'none';
+  if(n===3) renderInstr3Preview();
 }
 
 function goToTask(){
+  document.getElementById('instr0').style.display = 'none';
   document.getElementById('instr1').style.display = 'none';
   document.getElementById('instr2').style.display = 'none';
   document.getElementById('instr3').style.display = 'none';
