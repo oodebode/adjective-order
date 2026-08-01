@@ -1017,7 +1017,7 @@ function renderPropertyShells(){
 function updateStats(){
   const pct = Math.min(100, (seenTrials.size / TOTAL_POSSIBLE_TRIALS) * 100);
   document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressLabel').textContent = `${seenTrials.size} of ${TOTAL_POSSIBLE_TRIALS} combinations seen`;
+  document.getElementById('progressLabel').textContent = `Progress`;
 }
 
 function initInstructions(){
