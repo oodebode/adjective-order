@@ -8,17 +8,61 @@
     --gray-label: #8a8a8a;
     --gray-line: #e3e3e3;
     --board-bg: #ffffff;
-    --word-size: min(283px, 34vh, 60vw);
+    --word-size: 283px;
   }
   *{box-sizing:border-box;}
-  body{
+  html, body{
     margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    height:100%;
+    overflow:hidden;
     background:#ffffff;
-    color:#222;
-    padding:14px 16px 18px;
   }
-  .wrap{max-width:940px;width:100%;margin:0 auto;position:relative;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    color:#222;
+  }
+
+  /* ---------------------------------------------------------------
+     Fixed-size design stage. The whole task is authored once at a
+     single fixed pixel size (STAGE_W x STAGE_H, kept in sync with the
+     JS constants below) and never reflows or re-wraps its own
+     internal layout. To "adapt" to whatever window the participant
+     actually has, JS uniformly scales this single stage up or down
+     (via a CSS transform) so it always fits the viewport -- the
+     layout itself is identical at every window size, just bigger or
+     smaller, which is what keeps every element in the same relative
+     position and avoids the overlap/collision bugs that responsive
+     reflow (text wrapping, elements dropping to new rows, etc.) can
+     produce. The stage keeps its landscape proportions no matter how
+     tall/narrow the window gets -- it is scaled down to fit, never
+     rotated or restacked into a portrait/column layout. ---------- */
+  #stageOuter{
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    overflow:hidden;
+  }
+  #stage{
+    position:absolute;
+    top:50%;
+    left:50%;
+    width:1550px;
+    height:800px;
+    transform-origin:center center;
+  }
+  .wrap{
+    width:100%;
+    height:100%;
+    margin:0 auto;
+    position:absolute;
+    top:0; left:0;
+    padding:14px 16px 18px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
 
   .box-unit{
     display:flex;
@@ -95,7 +139,7 @@
      trial in JS -- these five positions themselves never move. */
   .pentagon-wrap{
     position:relative;
-    width:min(94vw, 780px);
+    width:780px;
     aspect-ratio:160/150;
     margin:0 auto;
   }
@@ -176,21 +220,6 @@
   .opt:hover{transform:translateY(-1px);}
   .opt.selected{border-color:#111;}
 
-  @media (max-width:780px){
-    .pentagon-wrap{
-      width:100%;
-      aspect-ratio:auto;
-      height:auto;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:18px;
-      position:static;
-    }
-    .core-stack{ position:static; transform:none; order:-1; }
-    .pent-slot{ position:static; transform:none; width:auto; order:initial; }
-  }
-
   /* motion animations, applied to the <g> wrapping the shape. */
   .m-rotate{ animation: rotateAnim 3s linear infinite; }
   .m-shake{  animation: shakeAnim 0.5s ease-in-out infinite; }
@@ -208,13 +237,13 @@
   .intro-top{
     display:flex;
     align-items:center;
-    justify-content:flex-start;
-    gap:24px;
+    justify-content:center;
+    gap:220px;
     margin:10px 0 22px;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
   }
   .intro-left{
-    flex:0 1 220px;
+    flex:0 0 220px;
     max-width:220px;
     text-align:left;
     display:flex;
@@ -222,19 +251,19 @@
     gap:4px;
   }
   .intro-right{
-    flex:1 1 560px;
+    flex:0 0 auto;
     display:flex;
     justify-content:center;
   }
   .sandbox-pentagon{
-    width:min(92vw, 640px);
+    width:640px;
     margin-top:50px;
   }
   /* used on instruction pages 1 & 3 so their visual area occupies the
      same footprint/proportions as page 2's pentagon, just with a
      single element centered inside instead of the full pentagon */
   .static-frame{
-    width:min(92vw, 640px);
+    width:640px;
     aspect-ratio:160/150;
     margin-top:50px;
     display:flex;
@@ -274,7 +303,7 @@
      visual instead of beside it -- pulled tighter on all sides so
      the header + box + button still fit on one screen. */
   .instr-header-compact{ margin:8px auto 6px; }
-  .compact-pentagon{ width:min(80vw, 520px); margin-top:0; }
+  .compact-pentagon{ width:520px; margin-top:0; }
 
   .build-caption{
     font-size:13px;
@@ -284,42 +313,49 @@
     text-align:center;
   }
 
-  /* ---- agree / light-mode page: centered on the full viewport ---- */
-  #instr0{
-    min-height:calc(100vh - 32px);
+  /* ---- alignment + even-margin fix: the word-square (target) box and
+     the "Yours" box must (a) share the exact same vertical center,
+     since they sit in the same row, and (b) have equal breathing room
+     above and below themselves. Their surrounding chrome differs in
+     kind -- progress bar + caption above the word box, caption +
+     button below the Yours box -- and those two chrome blocks are
+     different heights, so naturally-sized content can't satisfy both
+     goals at once.
+
+     Fix: give every box a reserved slot of the SAME fixed height
+     above it and below it, on BOTH columns (mirroring whichever slot
+     doesn't have real content, invisibly, so the layout stays
+     symmetric). Content packs toward the box; any slack goes to the
+     outer edge. Because both columns end up with identical
+     [top-slot][box][bottom-slot] structure and height, the boxes
+     align by construction -- no absolute positioning needed -- and
+     the box-to-box gap is identical on every side. ---- */
+  .box-unit.chrome-managed{ gap:5px; }
+  .chrome-slot{
+    width:100%;
     display:flex;
+    flex-direction:column;
     align-items:center;
-    justify-content:center;
   }
-  .agree-box{
-    max-width:520px;
-    margin:0 auto;
-    text-align:center;
-  }
-  .agree-box .screen-title{ margin:0 0 10px; }
-  .agree-box .screen-text{ margin:0 0 10px; }
-  .agree-box .board-actions{ justify-content:center; }
+  .chrome-top{ justify-content:flex-end; gap:8px; height:60px; }
+  .chrome-bottom{ justify-content:flex-start; gap:14px; height:60px; }
+  .instr3-chrome-top{ justify-content:flex-end; height:20px; }
+  .instr3-chrome-bottom{ justify-content:flex-start; height:20px; }
+  .chrome-hidden{ visibility:hidden; }
+
+  /* .sandbox-pentagon's margin-top:50px exists only to give the page-2
+     sandbox breathing room under its intro text -- it has no business
+     on the real task screen or instruction page 3, where it silently
+     pushes the whole pentagon (and the "Yours" box inside it) down. */
+  #pentagonWrap, #instr3 .pentagon-wrap{ margin-top:0; }
 </style>
 </head>
 <body>
-
-<!-- Page 0: shown before any instructions. Asks the participant to set
-     their system display to light mode, and requires an explicit
-     "Agree" click before anything else is shown. -->
-<div class="wrap" id="instr0">
-  <div class="agree-box">
-    <h2 class="screen-title">Before you begin</h2>
-    <p class="screen-text">This task is designed to be viewed in <strong>light mode</strong>. Please take a moment to set your device's display settings to light mode before continuing.</p>
-    <p class="screen-text">By clicking Agree below, you confirm that your display is set to light mode and that you're ready to begin.</p>
-    <div class="board-actions">
-      <button class="action submit" onclick="goToPage(1)">Agree</button>
-    </div>
-  </div>
-</div>
+<div id="stageOuter"><div id="stage">
 
 <!-- Instruction page 1: text + the sandbox area showing only the plain
      shape outline -- no properties, no property boxes, no labels. -->
-<div class="wrap" id="instr1" style="display:none;">
+<div class="wrap" id="instr1">
   <div class="intro-top">
     <div class="intro-left">
       <h2 class="screen-title">How this task works</h2>
@@ -376,11 +412,14 @@
   </div>
   <div class="intro-top" style="justify-content:center;align-items:center;">
     <div class="intro-left task-target-col">
-      <div class="box-unit">
-        <div class="build-caption">Build a...</div>
+      <div class="box-unit chrome-managed">
+        <div class="chrome-slot instr3-chrome-top">
+          <div class="build-caption">Build a...</div>
+        </div>
         <div class="word-square" id="sampleTargetSquare">
           <div class="word-float" id="sampleTargetFloat"></div>
         </div>
+        <div class="chrome-slot instr3-chrome-bottom chrome-hidden" aria-hidden="true"></div>
       </div>
     </div>
     <div class="intro-right">
@@ -391,8 +430,12 @@
         <div class="pent-slot pent-3" id="instr3-prop-slot-3"></div>
         <div class="pent-slot pent-4" id="instr3-prop-slot-4"></div>
         <div class="core-stack">
-          <div class="box-unit">
+          <div class="box-unit chrome-managed">
+            <div class="chrome-slot instr3-chrome-top chrome-hidden" aria-hidden="true">
+              <div class="build-caption">Build a...</div>
+            </div>
             <div class="box" id="instr3ShapeBox"></div>
+            <div class="chrome-slot instr3-chrome-bottom"></div>
           </div>
         </div>
       </div>
@@ -407,14 +450,19 @@
 <div class="wrap" id="taskWrap" style="display:none;">
   <div class="intro-top" style="justify-content:center;align-items:center;">
     <div class="intro-left task-target-col">
-      <div class="progress-wrap">
-        <div class="progress-label">Progress</div>
-        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-      </div>
-      <div class="box-unit">
-        <div class="build-caption">Build a...</div>
+      <div class="box-unit chrome-managed">
+        <div class="chrome-slot chrome-top">
+          <div class="progress-wrap" style="margin:0;">
+            <div class="progress-label">Progress</div>
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+          <div class="build-caption">Build a...</div>
+        </div>
         <div class="word-square" id="wordSquare">
           <div class="word-float" id="wordFloat"></div>
+        </div>
+        <div class="chrome-slot chrome-bottom chrome-hidden" aria-hidden="true">
+          <div class="board-actions" style="margin-top:0;"><button class="action submit" tabindex="-1">Next</button></div>
         </div>
       </div>
     </div>
@@ -427,10 +475,19 @@
         <div class="pent-slot pent-4" id="prop-slot-4"></div>
 
         <div class="core-stack">
-          <div class="box-unit">
+          <div class="box-unit chrome-managed">
+            <div class="chrome-slot chrome-top chrome-hidden" aria-hidden="true">
+              <div class="progress-wrap" style="margin:0;">
+                <div class="progress-label">Progress</div>
+                <div class="progress-track"><div class="progress-fill"></div></div>
+              </div>
+              <div class="build-caption">Build a...</div>
+            </div>
             <div class="box" id="shapeBox"></div>
-            <div class="board-actions">
-              <button class="action submit" id="nextBtn" onclick="submitTrial()">Next</button>
+            <div class="chrome-slot chrome-bottom">
+              <div class="board-actions" style="margin-top:0;">
+                <button class="action submit" id="nextBtn" onclick="submitTrial()">Next</button>
+              </div>
             </div>
           </div>
         </div>
@@ -438,6 +495,8 @@
     </div>
   </div>
 </div>
+
+</div></div>
 
 <script>
 /* ---------------------------------------------------------------
@@ -1008,7 +1067,6 @@ function renderInstr3Preview(){
    Page navigation.
 ---------------------------------------------------------------- */
 function goToPage(n){
-  document.getElementById('instr0').style.display = n===0 ? '' : 'none';
   document.getElementById('instr1').style.display = n===1 ? '' : 'none';
   document.getElementById('instr2').style.display = n===2 ? '' : 'none';
   document.getElementById('instr3').style.display = n===3 ? '' : 'none';
@@ -1016,7 +1074,6 @@ function goToPage(n){
 }
 
 function goToTask(){
-  document.getElementById('instr0').style.display = 'none';
   document.getElementById('instr1').style.display = 'none';
   document.getElementById('instr2').style.display = 'none';
   document.getElementById('instr3').style.display = 'none';
@@ -1034,6 +1091,23 @@ function initInstructions(){
 }
 
 initInstructions();
+
+/* ---------------------------------------------------------------
+   Fit the fixed-size stage to whatever window the participant has.
+   The stage's own layout never changes -- only its overall scale --
+   so nothing ever wraps, stacks, or overlaps differently at
+   different window sizes; it just gets bigger or smaller as a whole,
+   always keeping its landscape design intact.
+---------------------------------------------------------------- */
+const STAGE_W = 1550;
+const STAGE_H = 800;
+function fitStage(){
+  const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  document.getElementById('stage').style.transform = `translate(-50%,-50%) scale(${scale})`;
+}
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', fitStage);
+fitStage();
 </script>
 </body>
 </html>
