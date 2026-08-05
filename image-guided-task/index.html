@@ -543,20 +543,34 @@ function lineWidthUnits(id){
    shape always reads as an outline rather than a solid block.
    Dotted is a classic polka-dot pattern: an evenly spaced square
    grid of clearly separated circles.
+
+   patternUnits="userSpaceOnUse" tiles from (0,0) of whichever SVG's
+   local coordinate system the pattern is referenced in. The build box
+   always draws its shape at a fixed (cx,cy) in a fixed 200x200 canvas,
+   but the target image's crop (targetFootprintSvg) is sized tightly
+   around the shape itself, so its own (cx,cy) sits at a different
+   absolute position each time depending on the shape's size and
+   stroke width. Two renders of "the same" dotted shape therefore
+   landed on a different phase of the tile grid and visibly showed a
+   different dot arrangement. Anchoring the pattern's origin at the
+   shape's own center (via x/y here, or a translate in patternTransform
+   for the rotated stripe pattern) fixes a tile boundary to the shape
+   itself, so the pattern lines up identically no matter which
+   coordinate system it's drawn in.
 ---------------------------------------------------------------- */
-function textureFill(texture, colorId, context){
+function textureFill(texture, colorId, context, cx, cy){
   if(!texture) return { fill:'none', def:'' };
   const color = colorHex(colorId);
   const id = `pat_${context}_${texture}_${colorId||'neutral'}`;
   let def = '';
   if(texture === 'striped'){
-    def = `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    def = `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="translate(${cx},${cy}) rotate(45)">
       <rect width="6" height="6" fill="white"/>
       <rect x="0" width="3" height="6" fill="${color}"/>
     </pattern>`;
   } else if(texture === 'dotted'){
     const w = 10, h = 10, r = 3.6;
-    def = `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">
+    def = `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse" x="${cx}" y="${cy}">
       <rect width="${w}" height="${h}" fill="white"/>
       <circle cx="${w/2}" cy="${h/2}" r="${r}" fill="${color}"/>
     </pattern>`;
@@ -626,11 +640,36 @@ function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
   const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
   const strokeColor = colorHex(spec.color);
   const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100) * strokeMultiplier;
-  const fillInfo = textureFill(spec.texture, spec.color, context);
 
-  const fillEl = shapeElement(spec.shape, cx, cy, R, `fill="${fillInfo.fill}" stroke="none"`);
   const outlineR = R + strokeWidth / 2;
-  const outlineEl = shapeElement(spec.shape, cx, cy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
+
+  // An equilateral triangle's centroid (which is also its circumcircle's
+  // center, i.e. what regularPolygonPoints draws around) sits ABOVE the
+  // true vertical midpoint of its own bounding box: the apex is a full
+  // radius above the centroid, but the flat base is only half a radius
+  // below it. Drawing it circumcenter-first at (cx,cy) therefore looks
+  // shifted up within a square box. Nudge the center down by a quarter
+  // of the outer radius so the bounding box -- not the centroid -- ends
+  // up centered on (cx,cy); use the same shift for the fill and outline
+  // triangles (based on the outer radius either way) so they stay
+  // concentric with each other.
+  //
+  // BUT only while it's not spinning: the <g> this shape sits in still
+  // rotates around the untouched (cx,cy) (renderInto sets that as the
+  // transform-origin, not this shifted point), so shifting the triangle
+  // away from (cx,cy) turns a spin into an orbit around it instead of a
+  // rotation in place -- and that orbit sweeps well outside whatever
+  // margin the box has, since the box was only ever sized to fit the
+  // shape's own static extent around (cx,cy), not extent-plus-orbit.
+  // A continuously spinning triangle doesn't have a single "bounding
+  // box" to center in the first place, so there's nothing to fix there
+  // -- centering only matters, and is only safe, while it's at rest.
+  const shapeCy = (spec.shape === 'triangle' && spec.motion !== 'rotate') ? cy + outlineR * 0.25 : cy;
+
+  const fillInfo = textureFill(spec.texture, spec.color, context, cx, shapeCy);
+
+  const fillEl = shapeElement(spec.shape, cx, shapeCy, R, `fill="${fillInfo.fill}" stroke="none"`);
+  const outlineEl = shapeElement(spec.shape, cx, shapeCy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
 
   const motionClass = spec.motion ? ('m-' + spec.motion) : '';
   return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass, motionStyle: motionStyle(spec.motion), R, outlineR };
@@ -750,7 +789,7 @@ function trialKey(target){
 // use in the build box -- domainHalf 100, exactly like specToSvg uses
 // for every other box) so "large" targets are genuinely large and
 // "small" targets are genuinely small within the fixed 200x200 square.
-function targetFootprintSvg(spec){
+function targetFootprintSvg(spec, context){
   const domainHalf = 100;
   const R = domainHalf * (SIZE_FRACTION[spec.size] || SIZE_FRACTION.default);
   const strokeColor = colorHex(spec.color);
@@ -765,9 +804,17 @@ function targetFootprintSvg(spec){
   const halfExtent = R + strokeWidth;
   const size = halfExtent * 2;
   const c = halfExtent;
-  const fillInfo = textureFill(spec.texture, spec.color, 'targetimg');
-  const fillEl = shapeElement(spec.shape, c, c, R, `fill="${fillInfo.fill}" stroke="none"`);
-  const outlineEl = shapeElement(spec.shape, c, c, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
+  // Same fix as specToSvg, and same exception: recentering only makes
+  // sense (and only stays inside this tightly-fitted crop) while the
+  // triangle is at rest. The <g> below still rotates around the
+  // untouched (c,c), so shifting the triangle off that point would turn
+  // a spin into an orbit that sweeps past this crop's edges -- which
+  // have zero spare margin to begin with, since the crop is sized
+  // exactly to the shape's own static extent around (c,c).
+  const shapeC = (spec.shape === 'triangle' && spec.motion !== 'rotate') ? c + outlineR * 0.25 : c;
+  const fillInfo = textureFill(spec.texture, spec.color, context, c, shapeC);
+  const fillEl = shapeElement(spec.shape, c, shapeC, R, `fill="${fillInfo.fill}" stroke="none"`);
+  const outlineEl = shapeElement(spec.shape, c, shapeC, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
   const motionClass = spec.motion ? ('m-' + spec.motion) : '';
   const html = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block;">
       <defs>${fillInfo.def}</defs>
@@ -782,7 +829,17 @@ function targetFootprintSvg(spec){
 function renderTargetImage(zoneId, spec){
   const zone = document.getElementById(zoneId);
   zone.innerHTML = '';
-  const { html } = targetFootprintSvg(spec);
+  // Pass the zoneId through as the texture-fill "context" so its pattern
+  // <defs> id is unique per zone (pat_<zoneId>_<texture>_<color>). The
+  // instruction page 3 sample and the real task's target are two
+  // separate zones that both stay in the DOM (the sample's page is only
+  // ever hidden via CSS, never removed) and can easily land on the same
+  // texture+color at once -- without a zone-specific id, both would
+  // define an SVG <pattern> with the identical id, an invalid duplicate
+  // that leaves which one a `fill="url(#...)"` reference actually
+  // resolves to undefined, up to the browser -- which is how a
+  // perfectly valid fill definition could render as no dots at all.
+  const { html } = targetFootprintSvg(spec, zoneId);
   const el = document.createElement('div');
   el.className = 'tf-shape';
   el.innerHTML = html;
@@ -794,7 +851,7 @@ function renderTargetImage(zoneId, spec){
 ---------------------------------------------------------------- */
 const PAGE1_TEXT = "Welcome! Your job in this task is to build an animation based on some instructions we give you. You'll be given a plain outline shape, and then you’ll be asked to modify it to match a target description. Here's the plain outline you'll start from–nothing has been applied to it yet.";
 const PAGE2_TEXT = "Each shape has five properties you can control: size, texture, color, line width, and motion. Click through the options below to see how each one changes the shape–your build updates live. Try every option at least once before continuing.";
-const PAGE3_TEXT = "Each trial asks you to make a unique animation. You’ll see the ‘target’ animation in a box on the left, and you’ll have to adjust your copy to match it on each of the five properties. The order of the properties doesn’t matter; build the animation in whatever way feels most natural to you. But you won’t be able to move on unless you build the shape correctly. Try it now!";
+const PAGE3_TEXT = "Each trial of the task will ask you to make a unique animation. You’ll see the ‘target’ animation in a box on the left, and you’ll have to adjust your copy to match it on each of the five properties. The order of the properties doesn’t matter; you can build the animation in whatever way feels most natural to you.";
 
 /* ---------------------------------------------------------------
    Page 2 sandbox: "Tried" = clicked that specific option (10 total).
