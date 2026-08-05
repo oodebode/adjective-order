@@ -711,8 +711,6 @@ const TOTAL_POSSIBLE_TRIALS = STIMULUS_DB.length;
 
 function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-function capitalize(word){ return word.charAt(0).toUpperCase() + word.slice(1); }
-
 function shuffle(arr){
   const a = arr.slice();
   for(let i=a.length-1;i>0;i--){
@@ -798,7 +796,7 @@ function newTrial(){
       return opt.word;
     });
     floatAnimHandle = startWordFloatIn('wordFloat', words);
-    document.getElementById('targetShapeName').textContent = capitalize(state.target.shape);
+    document.getElementById('targetShapeName').textContent = '...' + state.target.shape;
   }, BLANK_MS));
 
   // Stage 3 (at BLANK_MS + TARGET_ONLY_MS): the base (unbuilt) shape
@@ -904,15 +902,28 @@ function startWordFloatIn(zoneId, words){
 
   let handle = null;
 
-  requestAnimationFrame(()=>{
+  function whenMeasurable(fn){
+    // Instruction page 3 calls this while its whole page is still
+    // display:none (the very first call, at page load, before the
+    // participant ever reaches it) -- offsetWidth/Height read 0 then,
+    // since a display:none subtree has no box at all. Spawning words
+    // against a fallback size instead just placed them somewhere with
+    // no relation to the box's real 281x281 footprint, so the instant
+    // the page became visible they were jumbled up in whatever corner
+    // the fallback happened to bias toward. Wait for the zone to
+    // actually have a measurable size before placing anything in it.
+    const zw = zone.offsetWidth, zh = zone.offsetHeight;
+    if(zw && zh){ fn(zw, zh); return; }
+    handle = requestAnimationFrame(()=> whenMeasurable(fn));
+  }
+
+  handle = requestAnimationFrame(()=> whenMeasurable((zw, zh)=>{
     // Use offsetWidth/offsetHeight (unscaled layout size), not
     // getBoundingClientRect (post-transform, scaled by #stage's fit
     // scale) -- translate() below moves words in the same unscaled
     // local space, so bounds must be measured in that same space or
     // words drift outside the box and get clipped by overflow:hidden
     // whenever the stage isn't rendered at exactly 1:1 scale.
-    const zw = zone.offsetWidth || 140, zh = zone.offsetHeight || 70;
-
     const bodies = [];
     wordEls.forEach(el=>{
       const w = el.offsetWidth || 40;
@@ -933,20 +944,22 @@ function startWordFloatIn(zoneId, words){
 
     let lastT = performance.now();
 
-    function tick(now){
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const zw2 = zone.offsetWidth || zw, zh2 = zone.offsetHeight || zh;
+    // `bounce`: when true, a resolved contact also flips/swaps velocity
+    // (the physics "feel" -- happens once per frame, on first contact).
+    // When false, only position moves (used for the pure geometric
+    // clean-up pass below) -- repeatedly swapping velocity every
+    // relaxation iteration was itself a bug: it could leave a body's
+    // velocity pointing back into the contact that was just resolved,
+    // so the very next frame's integration re-created the overlap it
+    // had just fixed, on any wall or between any pair.
+    function clampToWalls(b, zw2, zh2, bounce){
+      if(b.x < WORD_MARGIN){ b.x = WORD_MARGIN; if(bounce) b.vx = Math.abs(b.vx); }
+      if(b.x + b.w > zw2 - WORD_MARGIN){ b.x = zw2 - WORD_MARGIN - b.w; if(bounce) b.vx = -Math.abs(b.vx); }
+      if(b.y < WORD_MARGIN){ b.y = WORD_MARGIN; if(bounce) b.vy = Math.abs(b.vy); }
+      if(b.y + b.h > zh2 - WORD_MARGIN){ b.y = zh2 - WORD_MARGIN - b.h; if(bounce) b.vy = -Math.abs(b.vy); }
+    }
 
-      bodies.forEach(b=>{
-        b.x += b.vx * dt;
-        b.y += b.vy * dt;
-        if(b.x < WORD_MARGIN){ b.x = WORD_MARGIN; b.vx = Math.abs(b.vx); }
-        if(b.x + b.w > zw2 - WORD_MARGIN){ b.x = zw2 - WORD_MARGIN - b.w; b.vx = -Math.abs(b.vx); }
-        if(b.y < WORD_MARGIN){ b.y = WORD_MARGIN; b.vy = Math.abs(b.vy); }
-        if(b.y + b.h > zh2 - WORD_MARGIN){ b.y = zh2 - WORD_MARGIN - b.h; b.vy = -Math.abs(b.vy); }
-      });
-
+    function separatePairs(bounce){
       for(let i=0;i<bodies.length;i++){
         for(let j=i+1;j<bodies.length;j++){
           const a = bodies[i], b = bodies[j];
@@ -960,21 +973,59 @@ function startWordFloatIn(zoneId, words){
             if(overlapX < overlapY){
               const push = overlapX/2 * (dx < 0 ? -1 : 1);
               a.x -= push; b.x += push;
-              const t = a.vx; a.vx = b.vx; b.vx = t;
+              if(bounce){ const t = a.vx; a.vx = b.vx; b.vx = t; }
             } else {
               const push = overlapY/2 * (dy < 0 ? -1 : 1);
               a.y -= push; b.y += push;
-              const t = a.vy; a.vy = b.vy; b.vy = t;
+              if(bounce){ const t = a.vy; a.vy = b.vy; b.vy = t; }
             }
           }
         }
       }
+    }
+
+    // A single wall/pair pass, done once with `bounce` on, gives the
+    // floating motion its physics feel. But it only resolves ONE
+    // constraint at a time, and they can undo each other -- pushing a
+    // word off a neighbor can shove it past a wall, and clamping it
+    // back to the wall can shove it straight back into that neighbor
+    // (or a third word). With just one pass some starting configurations
+    // never fully separate and stay visibly stuck: clipped into a wall
+    // or overlapping a neighbor, on any side, indefinitely. So after the
+    // physics pass, run a purely geometric clean-up -- position only, no
+    // velocity change -- for enough iterations that, for a handful of
+    // small pills in a much larger box, it always converges to a fully
+    // in-bounds, non-overlapping layout before that frame is drawn.
+    const POSITION_RELAX_ITERS = 80;
+
+    function tick(now){
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const zw2 = zone.offsetWidth || zw, zh2 = zone.offsetHeight || zh;
+
+      bodies.forEach(b=>{
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+      });
+
+      bodies.forEach(b=> clampToWalls(b, zw2, zh2, true));
+      separatePairs(true);
+
+      for(let iter=0; iter<POSITION_RELAX_ITERS; iter++){
+        bodies.forEach(b=> clampToWalls(b, zw2, zh2, false));
+        separatePairs(false);
+      }
+      // separatePairs() is always the last thing each iteration does,
+      // including the final one -- so without one more wall pass here,
+      // that very last push is never re-checked against the walls
+      // before this frame renders.
+      bodies.forEach(b=> clampToWalls(b, zw2, zh2, false));
 
       bodies.forEach(b=>{ b.el.style.transform = `translate(${b.x}px, ${b.y}px)`; });
       handle = requestAnimationFrame(tick);
     }
     handle = requestAnimationFrame(tick);
-  });
+  }));
 
   return handle;
 }
@@ -1069,7 +1120,7 @@ function renderSampleTarget(){
     return opt.word;
   });
   startWordFloatIn('sampleTargetFloat', words);
-  document.getElementById('instr3TargetShapeName').textContent = capitalize(sample.shape);
+  document.getElementById('instr3TargetShapeName').textContent = '...' + sample.shape;
 }
 
 function instr3BuildMatchesTarget(){
