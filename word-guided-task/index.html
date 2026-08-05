@@ -638,9 +638,22 @@ function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
   const strokeWidth = lineWidthUnits(spec.lineWidth) * (domainHalf / 100) * strokeMultiplier;
   const fillInfo = textureFill(spec.texture, spec.color, context);
 
-  const fillEl = shapeElement(spec.shape, cx, cy, R, `fill="${fillInfo.fill}" stroke="none"`);
   const outlineR = R + strokeWidth / 2;
-  const outlineEl = shapeElement(spec.shape, cx, cy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
+
+  // An equilateral triangle's centroid (which is also its circumcircle's
+  // center, i.e. what regularPolygonPoints draws around) sits ABOVE the
+  // true vertical midpoint of its own bounding box: the apex is a full
+  // radius above the centroid, but the flat base is only half a radius
+  // below it. Drawing it circumcenter-first at (cx,cy) therefore looks
+  // shifted up within a square box. Nudge the center down by a quarter
+  // of the outer radius so the bounding box -- not the centroid -- ends
+  // up centered on (cx,cy); use the same shift for the fill and outline
+  // triangles (based on the outer radius either way) so they stay
+  // concentric with each other.
+  const shapeCy = spec.shape === 'triangle' ? cy + outlineR * 0.25 : cy;
+
+  const fillEl = shapeElement(spec.shape, cx, shapeCy, R, `fill="${fillInfo.fill}" stroke="none"`);
+  const outlineEl = shapeElement(spec.shape, cx, shapeCy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
 
   const motionClass = spec.motion ? ('m-' + spec.motion) : '';
   return { def: fillInfo.def, shapeSvg: fillEl + outlineEl, motionClass, motionStyle: motionStyle(spec.motion) };
@@ -796,7 +809,7 @@ function newTrial(){
       return opt.word;
     });
     floatAnimHandle = startWordFloatIn('wordFloat', words);
-    document.getElementById('targetShapeName').textContent = '...' + state.target.shape;
+    document.getElementById('targetShapeName').textContent = '... ' +state.target.shape;
   }, BLANK_MS));
 
   // Stage 3 (at BLANK_MS + TARGET_ONLY_MS): the base (unbuilt) shape
@@ -1120,7 +1133,7 @@ function renderSampleTarget(){
     return opt.word;
   });
   startWordFloatIn('sampleTargetFloat', words);
-  document.getElementById('instr3TargetShapeName').textContent = '...' + sample.shape;
+  document.getElementById('instr3TargetShapeName').textContent = '... ' +sample.shape;
 }
 
 function instr3BuildMatchesTarget(){
