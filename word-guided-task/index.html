@@ -85,6 +85,25 @@
     overflow:visible;
   }
   .box svg{overflow:visible;}
+  /* Every shape is drawn inside a <g> that gets rotated/shaken around a
+     specific pivot (transform-origin, set inline per-shape in JS to the
+     shape's own true center). That pivot is only correct if it's read
+     against the SVG's own viewport coordinates ("view-box") rather than
+     the <g>'s own painted bounding box ("fill-box", which is what some
+     engines fall back to for SVG elements when this isn't set at all).
+     Those two only coincide for shapes whose bounding box happens to be
+     centered on their own visual center -- true for the square and
+     oval here, but never true for a triangle (its apex sits a full
+     radius above its own bbox center) -- so an unspecified default
+     would rotate a triangle around the wrong point and swing it
+     visibly outside its box, while every other shape looked fine.
+     This has to be a real stylesheet rule, not inline style on the
+     <g> itself: setting transform-box via a string passed through
+     innerHTML gets silently dropped by at least one engine's SVG
+     inline-style parsing, even though the property is fully supported
+     and takes effect immediately if set via the CSSOM afterward. A
+     stylesheet rule doesn't go through that parsing path. */
+  .box svg g, .opt svg g{ transform-box: view-box; }
   /* fixed across every trial -- only the shape drawn inside changes. */
   #shapeBox, #sandboxBox, #shapeOnlyBox, #instr3ShapeBox{ width:200px; height:200px; }
 
@@ -650,7 +669,18 @@ function specToSvg(spec, cx, cy, context, strokeMultiplier=1){
   // up centered on (cx,cy); use the same shift for the fill and outline
   // triangles (based on the outer radius either way) so they stay
   // concentric with each other.
-  const shapeCy = spec.shape === 'triangle' ? cy + outlineR * 0.25 : cy;
+  //
+  // BUT only while it's not spinning: the <g> this shape sits in still
+  // rotates around the untouched (cx,cy) (renderInto sets that as the
+  // transform-origin, not this shifted point), so shifting the triangle
+  // away from (cx,cy) turns a spin into an orbit around it instead of a
+  // rotation in place -- and that orbit sweeps well outside whatever
+  // margin the box has, since the box was only ever sized to fit the
+  // shape's own static extent around (cx,cy), not extent-plus-orbit.
+  // A continuously spinning triangle doesn't have a single "bounding
+  // box" to center in the first place, so there's nothing to fix there
+  // -- centering only matters, and is only safe, while it's at rest.
+  const shapeCy = (spec.shape === 'triangle' && spec.motion !== 'rotate') ? cy + outlineR * 0.25 : cy;
 
   const fillEl = shapeElement(spec.shape, cx, shapeCy, R, `fill="${fillInfo.fill}" stroke="none"`);
   const outlineEl = shapeElement(spec.shape, cx, shapeCy, outlineR, `fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round"`);
